@@ -21,5 +21,8 @@ public class GameState {
     public List<SystemNode> getSystems() {
         return Collections.unmodifiableList(systems);
     }
+    public void clearSystems() {
+        this.systems.clear();
+    }
 
 }

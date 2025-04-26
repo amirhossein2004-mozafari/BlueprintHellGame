@@ -18,17 +18,14 @@ public class GameController {
     }
 
     public void initializeGame() {
-        SystemNode system1 = new SystemNode(100, 150);
-        SystemNode system2 = new SystemNode(400, 300);
-        SystemNode system3 = new SystemNode(700, 100);
-
-        gameState.addSystem(system1);
-        gameState.addSystem(system2);
-        gameState.addSystem(system3);
-
-        gameView.drawInitialSystems(gameState);
-
-        System.out.println("Game Initialized with " + gameState.getSystems().size() + " systems.");
+        gameState.clearSystems();
+        gameState.addSystem(new SystemNode(150, 100));
+        gameState.addSystem(new SystemNode(700, 100));
+        gameState.addSystem(new SystemNode(400, 300));
+        gameState.addSystem(new SystemNode(150, 500));
+        gameState.addSystem(new SystemNode(700, 500));
+        gameView.drawInitialState(gameState);
+        System.out.println("Game Initialized with " + gameState.getSystems().size() + " systems in a fixed layout (random ports).");
     }
 
     public void handleMousePress(MouseEvent event) {
@@ -47,7 +44,6 @@ public class GameController {
     }
 
     public void updateGame(double deltaTime) {
-
     }
 
     public void pauseGameLogic() {
