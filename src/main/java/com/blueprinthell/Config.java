@@ -4,8 +4,7 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.paint.Color;
 import javafx.util.Duration;
 
-
-public class Config {
+public final class Config {
 
     public static final double WINDOW_WIDTH = 1024;
     public static final double WINDOW_HEIGHT = 768;
@@ -19,6 +18,7 @@ public class Config {
     public static final double BASE_PACKET_SPEED = 100.0;
     public static final double TRIANGLE_PACKET_ACCELERATION = 20.0;
     public static final double SPEED_FACTOR_INCOMPATIBLE_START = 0.5;
+    public static final double PACKET_SIZE = 8.0;
 
     public static final double COLLISION_IMPACT_RADIUS = 150.0;
     public static final double COLLISION_IMPACT_BASE_FORCE = 300.0;
@@ -26,7 +26,6 @@ public class Config {
     public static final int ATAR_SKILL_COST = 3;
     public static final int AIRYAMAN_SKILL_COST = 4;
     public static final int ANAHITA_SKILL_COST = 5;
-
     public static final double ATAR_SKILL_DURATION_SECONDS = 10.0;
     public static final double AIRYAMAN_SKILL_DURATION_SECONDS = 5.0;
 
@@ -37,24 +36,24 @@ public class Config {
 
     public static final Duration HUD_AUTO_HIDE_DELAY = Duration.seconds(3);
 
-    public static KeyCode KEY_TIME_FORWARD = KeyCode.RIGHT;
-    public static KeyCode KEY_TIME_BACKWARD = KeyCode.LEFT;
-    public static KeyCode KEY_SHOP = KeyCode.B;
-    public static KeyCode KEY_EXECUTE_RUN = KeyCode.SPACE;
-    public static KeyCode KEY_TOGGLE_HUD = KeyCode.H;
-    public static KeyCode KEY_PAUSE = KeyCode.P;
-    public static KeyCode KEY_EXIT_TO_MENU = KeyCode.ESCAPE;
-
     public static final double SYSTEM_WIDTH = 80.0;
-    public static final double SYSTEM_HEIGHT = 50.0;
-    public static final double PORT_RADIUS = 6.0;
-    public static final double PACKET_SIZE = 8.0;
+    public static final double SYSTEM_HEIGHT = 75.0;
+    public static final double SYSTEM_CORNER_ARC = 14.0;
+    public static final double SYSTEM_DIVIDER_X_OFFSET = 20.0;
+    public static final double PORT_OFFSET_X = 8.0;
+    public static final double PORT_BASE_SIZE_UNIT = 4.0;
+    public static final double PORT_VISUAL_SIZE_SQUARE = PORT_BASE_SIZE_UNIT * 1.4;
+    public static final double PORT_VISUAL_SIZE_TRIANGLE = PORT_BASE_SIZE_UNIT * 2.1;
+    public static final double INDICATOR_HEIGHT = 4.0;
+    public static final double INDICATOR_PADDING_X = 5.0;
+    public static final double INDICATOR_Y_POS = 5.0;
     public static final double WIRE_THICKNESS = 2.0;
 
     public static final Color COLOR_BACKGROUND = Color.rgb(20, 20, 30);
     public static final Color COLOR_SYSTEM_RECT = Color.rgb(70, 70, 90);
-    public static final Color COLOR_SYSTEM_INDICATOR_OFF = Color.DARKRED;
-    public static final Color COLOR_SYSTEM_INDICATOR_ON = Color.LIMEGREEN;
+    public static final Color COLOR_SYSTEM_DIVIDER = Color.rgb(50, 50, 65);
+    public static final Color COLOR_SYSTEM_INDICATOR_OFF = Color.rgb(255, 70, 70);
+    public static final Color COLOR_SYSTEM_INDICATOR_ON = Color.rgb(70, 255, 70);
     public static final Color COLOR_PORT_SQUARE = Color.rgb(70, 130, 180);
     public static final Color COLOR_PORT_TRIANGLE = Color.rgb(144, 238, 144);
     public static final Color COLOR_PACKET_SQUARE = Color.rgb(135, 206, 250);
@@ -69,13 +68,20 @@ public class Config {
     public static final Color COLOR_SHOP_BUTTON = Color.rgb(80, 80, 120);
     public static final Color COLOR_SHOP_BUTTON_HOVER = Color.rgb(100, 100, 150);
 
+    public static KeyCode KEY_TIME_FORWARD = KeyCode.RIGHT;
+    public static KeyCode KEY_TIME_BACKWARD = KeyCode.LEFT;
+    public static KeyCode KEY_SHOP = KeyCode.B;
+    public static KeyCode KEY_EXECUTE_RUN = KeyCode.SPACE;
+    public static KeyCode KEY_TOGGLE_HUD = KeyCode.H;
+    public static KeyCode KEY_PAUSE = KeyCode.P;
+    public static KeyCode KEY_EXIT_TO_MENU = KeyCode.ESCAPE;
+
     public static final String SOUND_CONNECT_SUCCESS = "/sounds/connect.wav";
     public static final String SOUND_PACKET_DAMAGE = "/sounds/damage.wav";
     public static final String SOUND_BACKGROUND_MUSIC = "/sounds/background.mp3";
     public static final String SOUND_SHOP_BUY = "/sounds/buy.wav";
     public static final String SOUND_LEVEL_COMPLETE = "/sounds/complete.wav";
     public static final String SOUND_GAME_OVER = "/sounds/gameover.wav";
-
 
     private Config() {
     }
