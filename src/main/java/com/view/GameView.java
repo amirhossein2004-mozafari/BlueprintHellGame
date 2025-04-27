@@ -74,7 +74,7 @@ public class GameView extends Pane {
                 size = Config.PORT_VISUAL_SIZE_TRIANGLE;
                 Polygon trianglePort = new Polygon();
                 double x1, y1, x2, y2, x3, y3;
-                double hf = 1.0, bf = 0.866;
+                double hf = 1.0, bf = 0.866; // sqrt(3)/2
                 if (port.getType() == PortType.INPUT) { x1=cx+size*hf*0.6; y1=cy; x2=cx-size*hf*0.4; y2=cy-size*bf; x3=cx-size*hf*0.4; y3=cy+size*bf;}
                 else { x1=cx-size*hf*0.6; y1=cy; x2=cx+size*hf*0.4; y2=cy-size*bf; x3=cx+size*hf*0.4; y3=cy+size*bf;}
                 trianglePort.getPoints().addAll(x1, y1, x2, y2, x3, y3);
@@ -148,7 +148,6 @@ public class GameView extends Pane {
         for (Packet packet : gameState.getPackets()) {
             Node node = packetNodes.get(packet);
             if (node != null) {
-                double size = Config.PACKET_SIZE;
                 node.relocate(packet.getX() - node.getBoundsInLocal().getWidth() / 2.0,
                         packet.getY() - node.getBoundsInLocal().getHeight() / 2.0);
             } else {

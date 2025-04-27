@@ -27,6 +27,7 @@ public class GameState {
     public void clearSystems() {
         this.systems.clear();
     }
+
     public void addPacket(Packet packet) {
         if (packet != null) {
             this.packets.add(packet);
@@ -40,5 +41,4 @@ public class GameState {
     public void clearPackets() {
         this.packets.clear();
     }
-
 }

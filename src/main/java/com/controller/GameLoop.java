@@ -3,7 +3,6 @@ package com.controller;
 import javafx.animation.AnimationTimer;
 import javafx.scene.control.Label;
 
-
 public class GameLoop extends AnimationTimer {
 
     private final GameController gameController;

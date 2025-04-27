@@ -54,7 +54,9 @@ public class GameController {
 
     public void handleMousePress(MouseEvent event) {
         if (isWiring) return;
+
         Port clickedPort = findClickedPort(event.getX(), event.getY(), PortType.OUTPUT);
+
         if (clickedPort != null) {
             isWiring = true;
             wiringStartPort = clickedPort;
@@ -81,6 +83,7 @@ public class GameController {
 
     public void handleMouseRelease(MouseEvent event) {
         if (isWiring) {
+
             isWiring = false;
             wiringStartPort = null;
             if (tempWire != null) {
