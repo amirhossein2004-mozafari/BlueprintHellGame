@@ -2,16 +2,19 @@ package com.view;
 
 import com.blueprinthell.Config;
 import com.model.*;
+
+import javafx.scene.Node;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
-import javafx.scene.shape.Circle;
-import javafx.scene.shape.Line;
-import javafx.scene.shape.Polygon;
-import javafx.scene.shape.Rectangle;
-import javafx.scene.shape.Shape;
+import javafx.scene.shape.*;
+
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class GameView extends Pane {
+
+    private final Map<Packet, Node> packetNodes = new HashMap<>();
 
     public GameView(double width, double height) {
         this.setPrefSize(width, height);
@@ -20,10 +23,16 @@ public class GameView extends Pane {
         this.setStyle("-fx-background-color: #" + Config.COLOR_BACKGROUND.toString().substring(2) + ";");
     }
 
-    public void drawInitialState(GameState gameState) {
+    public void redrawAll(GameState gameState) {
         this.getChildren().clear();
+        packetNodes.clear();
+
         for (SystemNode system : gameState.getSystems()) {
             drawSingleSystem(system);
+        }
+
+        for (Packet packet : gameState.getPackets()) {
+            drawSinglePacket(packet);
         }
     }
 
@@ -52,7 +61,7 @@ public class GameView extends Pane {
     private void drawPortsForSystem(List<Port> ports) {
         for (Port port : ports) {
             Shape portShape = null;
-            double size = 0;
+            double size;
             double cx = port.getAbsoluteX();
             double cy = port.getAbsoluteY();
 
@@ -65,18 +74,9 @@ public class GameView extends Pane {
                 size = Config.PORT_VISUAL_SIZE_TRIANGLE;
                 Polygon trianglePort = new Polygon();
                 double x1, y1, x2, y2, x3, y3;
-                double hf = 1.0;
-                double bf = 0.866;
-
-                if (port.getType() == PortType.INPUT) {
-                    x1 = cx + size * hf * 0.6; y1 = cy;
-                    x2 = cx - size * hf * 0.4; y2 = cy - size * bf;
-                    x3 = cx - size * hf * 0.4; y3 = cy + size * bf;
-                } else {
-                    x1 = cx - size * hf * 0.6; y1 = cy;
-                    x2 = cx + size * hf * 0.4; y2 = cy - size * bf;
-                    x3 = cx + size * hf * 0.4; y3 = cy + size * bf;
-                }
+                double hf = 1.0, bf = 0.866;
+                if (port.getType() == PortType.INPUT) { x1=cx+size*hf*0.6; y1=cy; x2=cx-size*hf*0.4; y2=cy-size*bf; x3=cx-size*hf*0.4; y3=cy+size*bf;}
+                else { x1=cx-size*hf*0.6; y1=cy; x2=cx+size*hf*0.4; y2=cy-size*bf; x3=cx+size*hf*0.4; y3=cy+size*bf;}
                 trianglePort.getPoints().addAll(x1, y1, x2, y2, x3, y3);
                 trianglePort.setFill(Config.COLOR_PORT_TRIANGLE);
                 portShape = trianglePort;
@@ -103,5 +103,65 @@ public class GameView extends Pane {
         indicatorRect.setArcWidth(3);
         indicatorRect.setArcHeight(3);
         this.getChildren().add(indicatorRect);
+    }
+
+    private void drawSinglePacket(Packet packet) {
+        Node packetNode = createPacketNode(packet);
+        if (packetNode != null) {
+            this.getChildren().add(packetNode);
+            packetNodes.put(packet, packetNode);
+        }
+    }
+
+    private Node createPacketNode(Packet packet) {
+        double size = Config.PACKET_SIZE;
+        double x = packet.getX();
+        double y = packet.getY();
+        Node node = null;
+        if (packet.getType() == PacketType.SQUARE) {
+            Rectangle rect = new Rectangle(x - size / 2.0, y - size / 2.0, size, size);
+            rect.setFill(Config.COLOR_PACKET_SQUARE);
+            node = rect;
+        } else if (packet.getType() == PacketType.TRIANGLE) {
+            Polygon poly = new Polygon();
+            double height = size * Math.sqrt(3) / 2.0;
+            poly.getPoints().addAll( x, y - height * (2.0/3.0), x - size / 2.0, y + height * (1.0/3.0), x + size / 2.0, y + height * (1.0/3.0) );
+            poly.setFill(Config.COLOR_PACKET_TRIANGLE);
+            node = poly;
+        }
+        if(node instanceof Shape) { ((Shape)node).setStroke(Color.DARKSLATEGRAY); ((Shape)node).setStrokeWidth(0.5); }
+        return node;
+    }
+
+    public void addNode(Node node) {
+        if (node != null && !this.getChildren().contains(node)) {
+            if (node instanceof Line) { this.getChildren().add(0, node); }
+            else { this.getChildren().add(node); }
+        }
+    }
+
+    public void removeNode(Node node) {
+        if (node != null) { this.getChildren().remove(node); }
+    }
+
+    public void updatePacketPositions(GameState gameState) {
+        for (Packet packet : gameState.getPackets()) {
+            Node node = packetNodes.get(packet);
+            if (node != null) {
+                double size = Config.PACKET_SIZE;
+                node.relocate(packet.getX() - node.getBoundsInLocal().getWidth() / 2.0,
+                        packet.getY() - node.getBoundsInLocal().getHeight() / 2.0);
+            } else {
+                drawSinglePacket(packet);
+            }
+        }
+        List<Packet> currentPackets = gameState.getPackets();
+        packetNodes.entrySet().removeIf(entry -> {
+            if (!currentPackets.contains(entry.getKey())) {
+                this.getChildren().remove(entry.getValue());
+                return true;
+            }
+            return false;
+        });
     }
 }
