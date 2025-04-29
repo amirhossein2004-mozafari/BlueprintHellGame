@@ -8,7 +8,7 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.shape.Line;
 import javafx.scene.paint.Color;
-
+import javafx.geometry.Point2D;
 import java.util.List;
 import java.util.Random;
 
@@ -30,6 +30,7 @@ public class GameController {
     public void initializeGame() {
         gameState.clearSystems();
         gameState.clearPackets();
+        gameState.clearConnections();
 
         double[][] positions = { {150, 100}, {700, 100}, {400, 300}, {150, 500}, {700, 500} };
         for (int i = 0; i < 5; i++) {
@@ -82,18 +83,48 @@ public class GameController {
     }
 
     public void handleMouseRelease(MouseEvent event) {
+        boolean connectionMade = false;
         if (isWiring) {
 
-            isWiring = false;
-            wiringStartPort = null;
-            if (tempWire != null) {
-                gameView.removeNode(tempWire);
-                tempWire = null;
+            Port targetPort = findClickedPort(event.getX(), event.getY(), PortType.INPUT);
+
+            if (targetPort != null &&
+                    targetPort.getParentSystem() != wiringStartPort.getParentSystem() &&
+                    targetPort.getPacketType() == wiringStartPort.getPacketType() )
+
+            {
+
+                double requiredLength = new Point2D(wiringStartPort.getAbsoluteX(), wiringStartPort.getAbsoluteY())
+                        .distance(targetPort.getAbsoluteX(), targetPort.getAbsoluteY());
+
+                if (gameState.getRemainingWireLength() >= requiredLength) {
+                    Connection newConnection = new Connection(wiringStartPort, targetPort);
+
+                    if (gameState.useWire(requiredLength)) {
+                        gameState.addConnection(newConnection);
+                        System.out.println("Connection created successfully! Length: " + String.format("%.1f", requiredLength));
+                        connectionMade = true;
+                    } else {
+                        System.out.println("Wire length usage failed (should not happen after check).");
+                    }
+                } else {
+                    System.out.println("Wiring failed: Not enough wire length remaining.");
+                }
+            } else {
+                System.out.println("Wiring failed: Invalid target port (not input, same system, type mismatch, or already connected).");
             }
-            System.out.println("Wiring finished (no connection made yet).");
-        } else {
-            System.out.println("Mouse Released without wiring active.");
         }
+
+        isWiring = false;
+        wiringStartPort = null;
+        if (tempWire != null) {
+            gameView.removeNode(tempWire);
+            tempWire = null;
+        }
+        if (!connectionMade && event.getEventType() == MouseEvent.MOUSE_RELEASED) {
+            System.out.println("Wiring cancelled.");
+        }
+        gameView.redrawAll(gameState);
     }
 
     public void handleKeyPress(KeyCode code) {

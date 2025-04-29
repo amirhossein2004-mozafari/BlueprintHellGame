@@ -48,6 +48,10 @@ public final class Config {
     public static final double INDICATOR_PADDING_X = 5.0;
     public static final double INDICATOR_Y_POS = 5.0;
     public static final double WIRE_THICKNESS = 2.0;
+    public static final double WIRE_INDICATOR_WIDTH = 120.0;
+    public static final double WIRE_INDICATOR_HEIGHT = 35.0;
+    public static final double WIRE_INDICATOR_CORNER_ARC = 8.0;
+    public static final double WIRE_INDICATOR_PADDING = 10.0;
 
     public static final Color COLOR_BACKGROUND = Color.rgb(20, 20, 30);
     public static final Color COLOR_SYSTEM_RECT = Color.rgb(70, 70, 90);

@@ -26,14 +26,40 @@ public class GameView extends Pane {
     public void redrawAll(GameState gameState) {
         this.getChildren().clear();
         packetNodes.clear();
+        drawConnections(gameState.getConnections());
+        drawSystems(gameState.getSystems());
+        drawPackets(gameState.getPackets());
+    }
 
-        for (SystemNode system : gameState.getSystems()) {
+    private void drawConnections(List<Connection> connections) {
+        for (Connection connection : connections) {
+            drawSingleWire(connection);
+        }
+    }
+
+    private void drawSystems(List<SystemNode> systems) {
+        for (SystemNode system : systems) {
             drawSingleSystem(system);
         }
+    }
 
-        for (Packet packet : gameState.getPackets()) {
+    private void drawPackets(List<Packet> packets) {
+        for (Packet packet : packets) {
             drawSinglePacket(packet);
         }
+    }
+
+    private void drawSingleWire(Connection connection) {
+        Line wireLine = new Line(
+                connection.getStartPort().getAbsoluteX(),
+                connection.getStartPort().getAbsoluteY(),
+                connection.getEndPort().getAbsoluteX(),
+                connection.getEndPort().getAbsoluteY()
+        );
+        wireLine.setStroke(Config.COLOR_WIRE_NORMAL);
+        wireLine.setStrokeWidth(Config.WIRE_THICKNESS);
+        wireLine.setMouseTransparent(true);
+        this.getChildren().add(wireLine);
     }
 
     private void drawSingleSystem(SystemNode system) {
@@ -60,30 +86,7 @@ public class GameView extends Pane {
 
     private void drawPortsForSystem(List<Port> ports) {
         for (Port port : ports) {
-            Shape portShape = null;
-            double size;
-            double cx = port.getAbsoluteX();
-            double cy = port.getAbsoluteY();
-
-            if (port.getPacketType() == PacketType.SQUARE) {
-                size = Config.PORT_VISUAL_SIZE_SQUARE;
-                Rectangle squarePort = new Rectangle(cx - size, cy - size, size * 2, size * 2);
-                squarePort.setFill(Config.COLOR_PORT_SQUARE);
-                portShape = squarePort;
-            } else if (port.getPacketType() == PacketType.TRIANGLE) {
-                size = Config.PORT_VISUAL_SIZE_TRIANGLE;
-                Polygon trianglePort = new Polygon();
-                double x1, y1, x2, y2, x3, y3;
-                double hf = 1.0, bf = 0.866; // sqrt(3)/2
-                if (port.getType() == PortType.INPUT) { x1=cx+size*hf*0.6; y1=cy; x2=cx-size*hf*0.4; y2=cy-size*bf; x3=cx-size*hf*0.4; y3=cy+size*bf;}
-                else { x1=cx-size*hf*0.6; y1=cy; x2=cx+size*hf*0.4; y2=cy-size*bf; x3=cx+size*hf*0.4; y3=cy+size*bf;}
-                trianglePort.getPoints().addAll(x1, y1, x2, y2, x3, y3);
-                trianglePort.setFill(Config.COLOR_PORT_TRIANGLE);
-                portShape = trianglePort;
-            } else {
-                portShape = new Circle(cx, cy, Config.PORT_BASE_SIZE_UNIT * 0.5, Color.GRAY);
-            }
-
+            Shape portShape = createPortShape(port);
             if (portShape != null) {
                 portShape.setStroke(Color.BLACK);
                 portShape.setStrokeWidth(0.5);
@@ -91,6 +94,32 @@ public class GameView extends Pane {
             }
         }
     }
+
+    private Shape createPortShape(Port port) {
+        double size;
+        double cx = port.getAbsoluteX();
+        double cy = port.getAbsoluteY();
+
+        if (port.getPacketType() == PacketType.SQUARE) {
+            size = Config.PORT_VISUAL_SIZE_SQUARE;
+            Rectangle squarePort = new Rectangle(cx - size, cy - size, size * 2, size * 2);
+            squarePort.setFill(Config.COLOR_PORT_SQUARE);
+            return squarePort;
+        } else if (port.getPacketType() == PacketType.TRIANGLE) {
+            size = Config.PORT_VISUAL_SIZE_TRIANGLE;
+            Polygon trianglePort = new Polygon();
+            double x1, y1, x2, y2, x3, y3;
+            double hf = 1.0, bf = 0.866;
+            if (port.getType() == PortType.INPUT) { x1=cx+size*hf*0.6; y1=cy; x2=cx-size*hf*0.4; y2=cy-size*bf; x3=cx-size*hf*0.4; y3=cy+size*bf;}
+            else { x1=cx-size*hf*0.6; y1=cy; x2=cx+size*hf*0.4; y2=cy-size*bf; x3=cx+size*hf*0.4; y3=cy+size*bf;}
+            trianglePort.getPoints().addAll(x1, y1, x2, y2, x3, y3);
+            trianglePort.setFill(Config.COLOR_PORT_TRIANGLE);
+            return trianglePort;
+        } else {
+            return new Circle(cx, cy, Config.PORT_BASE_SIZE_UNIT * 0.5, Color.GRAY);
+        }
+    }
+
 
     private void drawIndicatorForSystem(SystemNode system) {
         Rectangle indicatorRect = new Rectangle();
