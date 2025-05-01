@@ -169,6 +169,15 @@ public class GameView extends Pane {
         }
     }
 
+    public void removePacketNode(Packet packet) {
+        if (packet != null) {
+            Node nodeToRemove = packetNodes.remove(packet);
+            if (nodeToRemove != null) {
+                this.getChildren().remove(nodeToRemove);
+            }
+        }
+    }
+
     public void removeNode(Node node) {
         if (node != null) { this.getChildren().remove(node); }
     }

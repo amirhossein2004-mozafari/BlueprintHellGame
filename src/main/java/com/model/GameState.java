@@ -4,8 +4,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import com.blueprinthell.Config;
-import javafx.beans.property.DoubleProperty;
-import javafx.beans.property.SimpleDoubleProperty;
+import javafx.beans.property.*;
 
 public class GameState {
 
@@ -13,11 +12,16 @@ public class GameState {
     private final List<Packet> packets;
     private final List<Connection> connections;
     private final DoubleProperty remainingWireLength;
+    private final IntegerProperty coins;
+    private final IntegerProperty packetLoss;
+
     public GameState() {
         this.systems = new ArrayList<>();
         this.packets = new ArrayList<>();
         this.connections = new ArrayList<>();
         this.remainingWireLength = new SimpleDoubleProperty(Config.INITIAL_WIRE_LENGTH);
+        this.coins = new SimpleIntegerProperty(0);
+        this.packetLoss = new SimpleIntegerProperty(0);
     }
 
     public void addSystem(SystemNode system) {
@@ -46,6 +50,12 @@ public class GameState {
 
     public void clearPackets() {
         this.packets.clear();
+    }
+
+    public void removePacket(Packet packet) {
+        if (packet != null) {
+            this.packets.remove(packet);
+        }
     }
 
     public void addConnection(Connection connection) {
@@ -77,4 +87,20 @@ public class GameState {
         }
         return false;
     }
+
+    public void addCoin(int amount) {
+        if (amount > 0) {
+            this.coins.set(this.coins.get() + amount);
+        }
+    }
+    public int getCoins() { return coins.get(); }
+    public IntegerProperty coinsProperty() { return coins; }
+
+    public void incrementPacketLoss(int amount) {
+        if (amount > 0) {
+            this.packetLoss.set(this.packetLoss.get() + amount);
+        }
+    }
+    public int getPacketLoss() {return packetLoss.get(); }
+    public IntegerProperty packetLossProperty() { return packetLoss; }
 }

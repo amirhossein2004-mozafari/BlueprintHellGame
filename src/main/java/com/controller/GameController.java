@@ -11,6 +11,8 @@ import javafx.scene.paint.Color;
 import javafx.geometry.Point2D;
 import java.util.List;
 import java.util.Random;
+import java.util.ArrayList;
+import java.util.Iterator;
 
 public class GameController {
 
@@ -40,18 +42,63 @@ public class GameController {
             }
         }
 
-        gameState.addPacket(new Packet(PacketType.SQUARE, 50, 50));
-        gameState.addPacket(new Packet(PacketType.TRIANGLE, 600, 400));
-        gameState.addPacket(new Packet(PacketType.SQUARE, 300, 50));
-
         gameView.redrawAll(gameState);
 
-        System.out.println("Game Initialized with " + gameState.getSystems().size() + " systems and " + gameState.getPackets().size() + " packets.");
+        System.out.println("Game Initialized with " + gameState.getSystems().size() + " systems.");
     }
+
+    private double timeSinceLastPacket = 0.0;
+    private final double PACKET_SPAWN_INTERVAL = 2.0;
 
     public void updateGame(double deltaTime) {
+        timeSinceLastPacket += deltaTime;
+        if (timeSinceLastPacket >= PACKET_SPAWN_INTERVAL && !gameState.getSystems().isEmpty()) {
+            timeSinceLastPacket -= PACKET_SPAWN_INTERVAL;
+            SystemNode sourceSystem = gameState.getSystems().get(0);
+            PacketType typeToSpawn = random.nextBoolean() ? PacketType.SQUARE : PacketType.TRIANGLE;
+            Port sourcePort = findAvailableOutputPort(typeToSpawn, sourceSystem, gameState);
+            if (sourcePort != null) {
+                Connection startConnection = findConnectionFromPort(sourcePort, gameState);
+                if (startConnection != null) {
+                    Packet newPacket = new Packet(typeToSpawn, sourcePort.getAbsoluteX(), sourcePort.getAbsoluteY());
+                    newPacket.startMoving(startConnection);
+                    gameState.addPacket(newPacket);
+                    System.out.println("Spawned packet: " + typeToSpawn + " from System 0");
+                }
+            }
+        }
 
+        List<Packet> packetsToRemove = new ArrayList<>();
+        List<Packet> packetsToAddBack = new ArrayList<>();
+
+        for(Packet packet : new ArrayList<>(gameState.getPackets())) {
+            boolean reachedEnd = packet.update(deltaTime);
+            if (reachedEnd) {
+                Port destinationPort = packet.getTargetPort();
+                if (destinationPort != null) {
+                    SystemNode destinationSystem = destinationPort.getParentSystem();
+                    destinationSystem.receivePacket(packet, gameState);
+                }
+                packetsToRemove.add(packet);
+            }
+        }
+
+        for (Packet packet : packetsToRemove) {
+            gameState.removePacket(packet);
+            gameView.removePacketNode(packet);
+        }
+
+        for (SystemNode system : gameState.getSystems()) {
+            Packet sentPacket = system.updateTrySend(deltaTime, gameState);
+            if (sentPacket != null) {
+                packetsToAddBack.add(sentPacket);
+            }
+        }
+        for (Packet p : packetsToAddBack) { gameState.addPacket(p); }
+
+        gameView.updatePacketPositions(gameState);
     }
+
 
     public void handleMousePress(MouseEvent event) {
         if (isWiring) return;
@@ -147,6 +194,28 @@ public class GameController {
         }
         return null;
     }
+
+    private Port findAvailableOutputPort(PacketType type, SystemNode system, GameState state) {
+        for (Port port : system.getOutputPorts()) {
+            if (port.getPacketType() == type) {
+                Connection connectedWire = findConnectionFromPort(port, state);
+                if (connectedWire != null ) {
+                    return port;
+                }
+            }
+        }
+        return null;
+    }
+
+    private Connection findConnectionFromPort(Port port, GameState state) {
+        for (Connection conn : state.getConnections()) {
+            if (conn.getStartPort() == port) {
+                return conn;
+            }
+        }
+        return null;
+    }
+
 
     public void pauseGameLogic() {
         System.out.println("Game Logic Paused (by Controller)");
