@@ -135,10 +135,14 @@ public class GameView extends Pane {
     }
 
     private void drawSinglePacket(Packet packet) {
-        Node packetNode = createPacketNode(packet);
-        if (packetNode != null) {
-            this.getChildren().add(packetNode);
-            packetNodes.put(packet, packetNode);
+        Node packetNode = packetNodes.get(packet);
+        if (packetNode == null) {
+            packetNode = createPacketNode(packet);
+            if (packetNode != null) {
+                packet.setVisualNode(packetNode);
+                this.getChildren().add(packetNode);
+                packetNodes.put(packet, packetNode);
+            }
         }
     }
 
@@ -160,6 +164,10 @@ public class GameView extends Pane {
         }
         if(node instanceof Shape) { ((Shape)node).setStroke(Color.DARKSLATEGRAY); ((Shape)node).setStrokeWidth(0.5); }
         return node;
+    }
+
+    public Node getNodeForPacket(Packet packet) {
+        return packetNodes.get(packet);
     }
 
     public void addNode(Node node) {
