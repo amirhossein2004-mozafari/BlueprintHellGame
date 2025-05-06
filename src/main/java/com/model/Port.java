@@ -1,6 +1,7 @@
 package com.model;
 
 import javafx.geometry.Point2D;
+import javafx.scene.shape.Shape;
 
 public class Port {
 
@@ -8,6 +9,7 @@ public class Port {
     private final PortType type;
     private final PacketType packetType;
     private final Point2D relativePosition;
+    private transient Shape visualShape = null;
 
     public Port(SystemNode parent, PortType type, PacketType packetType, Point2D relativePosition) {
         this.parentSystem = parent;
@@ -38,6 +40,13 @@ public class Port {
 
     public Point2D getRelativePosition() {
         return relativePosition;
+    }
+    public Shape getVisualShape() {
+        return visualShape;
+    }
+
+    public void setVisualShape(Shape visualShape) {
+        this.visualShape = visualShape;
     }
 
 }

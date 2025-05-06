@@ -58,7 +58,9 @@ public class SystemNode {
 
         if (storedPackets.size() < Config.SYSTEM_PACKET_STORAGE_CAPACITY) {
             storedPackets.add(packet);
-            gameState.addCoin(packet.getType() == PacketType.SQUARE ? 1 : 2);
+            int coinsToAdd = (packet.getType() == PacketType.SQUARE) ? 1 : 2;
+            gameState.addCoin(coinsToAdd);
+            System.out.println("Packet received & stored: " + packet.getType() + ". Added " + coinsToAdd + " coins. Total: " + gameState.getCoins());
         } else {
             gameState.incrementPacketLoss(1);
             System.out.println("Packet discarded, storage full: " + packet.getType());
@@ -91,6 +93,9 @@ public class SystemNode {
                         " via port type: " + connToSendOn.getStartPort().getPacketType());
             }
         }
+    }
+    public boolean isStorageFull() {
+        return storedPackets.size() >= Config.SYSTEM_PACKET_STORAGE_CAPACITY;
     }
 
     private Connection findAvailableConnectionFromSystem(SystemNode system, GameState state) {
@@ -128,6 +133,9 @@ public class SystemNode {
         return false;
     }
 
+    public int getStoredPacketCount() {
+        return storedPackets.size();
+    }
     public double getX() { return x; }
     public double getY() { return y; }
     public double getWidth() { return width; }

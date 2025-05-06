@@ -14,6 +14,7 @@ import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import java.io.IOException;
 import java.util.Objects;
+import javafx.scene.layout.BorderPane;
 
 public class MainApplication extends Application {
 
@@ -47,26 +48,25 @@ public class MainApplication extends Application {
     public void startGame(int levelNumber) {
         stopCurrentGameLoop();
         gameState = new GameState();
-        GameView gameView = new GameView(Config.WINDOW_WIDTH, Config.WINDOW_HEIGHT);
+        double gameViewHeight = Config.WINDOW_HEIGHT - 30.0;
+        GameView gameView = new GameView(Config.WINDOW_WIDTH, gameViewHeight);
         this.hudView = new HudView(gameState);
 
-        StackPane gameStackPane = new StackPane();
-        gameStackPane.getChildren().addAll(gameView, this.hudView);
-
-        StackPane.setAlignment(this.hudView, Pos.TOP_LEFT);
-        StackPane.setMargin(this.hudView, new Insets(10, 0, 0, 10));
-
-        gameController = new GameController(gameState, gameView);
+        BorderPane rootNode = new BorderPane();
+        rootNode.setTop(hudView);
+        rootNode.setCenter(gameView);
+        gameController = new GameController(gameState, gameView, this);
         gameController.initializeGame();
 
-        Scene gameScene = new Scene(gameStackPane, Config.WINDOW_WIDTH, Config.WINDOW_HEIGHT);
-        setupInputHandlers(gameScene, gameController, this.hudView);
+        Scene gameScene = new Scene(rootNode, Config.WINDOW_WIDTH, Config.WINDOW_HEIGHT);
+        setupInputHandlers(gameScene, gameController, hudView);
         applyStylesheet(gameScene, "/styles/style.css");
 
         gameLoop = new GameLoop(gameController);
         gameLoop.start();
+
         primaryStage.setScene(gameScene);
-        System.out.println("Game scene set with HUD and loop started for level " + levelNumber);
+        System.out.println("Game scene with Top HUD set and loop started for level " + levelNumber);
     }
 
     private void setupInputHandlers(Scene gameScene, GameController controller, HudView pHudView) {
@@ -80,7 +80,7 @@ public class MainApplication extends Application {
 
             if (code == Config.KEY_TOGGLE_HUD && pHudView != null) {
                 System.out.println("--- HUD TOGGLE KEY PRESSED --- Toggling HUD visibility...");
-                pHudView.toggleVisibility();
+              //  pHudView.toggleVisibility();
             } else if (code == KeyCode.ESCAPE) {
                 System.out.println("Escape pressed, exiting application.");
                 stopCurrentGameLoop();
@@ -105,7 +105,10 @@ public class MainApplication extends Application {
     public void showSettings() { stopCurrentGameLoop(); System.out.println("Show Settings - NIY."); }
     public void showShop() { System.out.println("Show Shop - NIY."); }
     public void hideShop() { System.out.println("Hide Shop - NIY."); }
-    public void showGameOver(boolean success, int score, int packetsLost) { stopCurrentGameLoop(); System.out.println("Show GameOver - NIY. Success: " + success); }
+
+    public void showGameOver(boolean success, int score, int packetsLost) {
+        stopCurrentGameLoop();
+        System.out.println(">>>> GAME OVER! Success: " + success + " | Score: " + score + " | Packets Lost: " + packetsLost + " <<<<");    }
 
     public Stage getPrimaryStage() { return primaryStage; }
     public GameState getGameState() { return gameState; }

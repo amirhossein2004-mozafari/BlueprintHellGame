@@ -7,14 +7,18 @@ import javafx.scene.Node;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.*;
-
+import javafx.scene.control.Label;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+
 public class GameView extends Pane {
 
     private final Map<Packet, Node> packetNodes = new HashMap<>();
+    private final Map<Port, Shape> portShapes = new HashMap<>();
 
     public GameView(double width, double height) {
         this.setPrefSize(width, height);
@@ -26,6 +30,7 @@ public class GameView extends Pane {
     public void redrawAll(GameState gameState) {
         this.getChildren().clear();
         packetNodes.clear();
+        portShapes.clear();
         drawConnections(gameState.getConnections());
         drawSystems(gameState.getSystems());
         drawPackets(gameState.getPackets());
@@ -82,6 +87,24 @@ public class GameView extends Pane {
         drawIndicatorForSystem(system);
         drawPortsForSystem(system.getInputPorts());
         drawPortsForSystem(system.getOutputPorts());
+
+        Label storedCountLabel = new Label();
+        String labelText = system.getStoredPacketCount() + "/" + Config.SYSTEM_PACKET_STORAGE_CAPACITY;
+        storedCountLabel.setText(labelText);
+        storedCountLabel.setFont(Font.font("Arial", FontWeight.BOLD, 10));
+        storedCountLabel.setTextFill(Color.WHITE);
+
+        double labelX = system.getX() + Config.SYSTEM_DIVIDER_X_OFFSET / 2.0 - storedCountLabel.prefWidth(-1) / 2.0;
+        double labelY = system.getY() + Config.INDICATOR_Y_POS + Config.INDICATOR_HEIGHT + 2;
+
+        labelX = system.getX() + 3;
+        labelY = system.getY() + system.getHeight() - 12 - 3;
+
+        storedCountLabel.setLayoutX(labelX);
+        storedCountLabel.setLayoutY(labelY);
+        storedCountLabel.setMouseTransparent(true);
+
+        this.getChildren().add(storedCountLabel);
     }
 
     private void drawPortsForSystem(List<Port> ports) {
@@ -90,6 +113,7 @@ public class GameView extends Pane {
             if (portShape != null) {
                 portShape.setStroke(Color.BLACK);
                 portShape.setStrokeWidth(0.5);
+                port.setVisualShape(portShape);
                 this.getChildren().add(portShape);
             }
         }
@@ -120,6 +144,16 @@ public class GameView extends Pane {
         }
     }
 
+
+    public Port findPortAt(double screenX, double screenY) {
+        for (Map.Entry<Port, Shape> entry : portShapes.entrySet()) {
+            Shape shape = entry.getValue();
+            if (shape.contains(screenX, screenY)) {
+                return entry.getKey();
+            }
+        }
+        return null;
+    }
 
     private void drawIndicatorForSystem(SystemNode system) {
         Rectangle indicatorRect = new Rectangle();
