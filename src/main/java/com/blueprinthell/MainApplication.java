@@ -62,7 +62,11 @@ public class MainApplication extends Application {
         setupInputHandlers(gameScene, gameController, hudView);
         applyStylesheet(gameScene, "/styles/style.css");
 
-        gameLoop = new GameLoop(gameController);
+        if (gameState == null || gameController == null) {
+            System.err.println("Error: GameState or GameController is null before creating GameLoop!");
+            return;
+        }
+        gameLoop = new GameLoop(gameController, gameState);
         gameLoop.start();
 
         primaryStage.setScene(gameScene);
@@ -80,7 +84,7 @@ public class MainApplication extends Application {
 
             if (code == Config.KEY_TOGGLE_HUD && pHudView != null) {
                 System.out.println("--- HUD TOGGLE KEY PRESSED --- Toggling HUD visibility...");
-              //  pHudView.toggleVisibility();
+
             } else if (code == KeyCode.ESCAPE) {
                 System.out.println("Escape pressed, exiting application.");
                 stopCurrentGameLoop();

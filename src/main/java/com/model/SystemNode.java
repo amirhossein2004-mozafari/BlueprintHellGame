@@ -5,7 +5,6 @@ import javafx.geometry.Point2D;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 
@@ -21,7 +20,7 @@ public class SystemNode {
     private boolean indicatorOn = false;
     private static final Random random = new Random();
 
-    public SystemNode(double x, double y) {
+    public SystemNode(double x, double y, List<PacketType> inputPortTypes, List<PacketType> outputPortTypes) {
         this.x = x;
         this.y = y;
         this.width = Config.SYSTEM_WIDTH;
@@ -29,38 +28,39 @@ public class SystemNode {
         this.inputPorts = new ArrayList<>();
         this.outputPorts = new ArrayList<>();
         this.storedPackets = new ArrayList<>();
-        createRandomPorts();
+        createSpecificPorts(inputPortTypes, outputPortTypes);
     }
 
-    private void createRandomPorts() {
-        int numInputs = random.nextInt(3) + 1;
-        double inputSpacing = height / (numInputs + 1.0);
-        for (int i = 1; i <= numInputs; i++) {
-            PacketType randomType = random.nextBoolean() ? PacketType.SQUARE : PacketType.TRIANGLE;
-            inputPorts.add(new Port(this, PortType.INPUT, randomType, new Point2D(Config.PORT_OFFSET_X, i * inputSpacing)));
+    public SystemNode(double x, double y) {
+        this(x, y, List.of(PacketType.SQUARE, PacketType.TRIANGLE), List.of(PacketType.SQUARE, PacketType.TRIANGLE)); // مثال پورت‌های پیش‌فرض
+    }
+
+    private void createSpecificPorts(List<PacketType> inputTypes, List<PacketType> outputTypes) {
+        if (inputTypes != null && !inputTypes.isEmpty()) {
+            double inputSpacing = height / (inputTypes.size() + 1.0);
+            for (int i = 0; i < inputTypes.size(); i++) {
+                double yPos = (i + 1) * inputSpacing;
+                inputPorts.add(new Port(this, PortType.INPUT, inputTypes.get(i), new Point2D(Config.PORT_OFFSET_X, yPos)));
+            }
         }
-        int numOutputs = random.nextInt(3) + 1;
-        double outputSpacing = height / (numOutputs + 1.0);
-        double outputX = width - Config.PORT_OFFSET_X;
-        for (int i = 1; i <= numOutputs; i++) {
-            PacketType randomType = random.nextBoolean() ? PacketType.SQUARE : PacketType.TRIANGLE;
-            outputPorts.add(new Port(this, PortType.OUTPUT, randomType, new Point2D(outputX, i * outputSpacing)));
+        if (outputTypes != null && !outputTypes.isEmpty()) {
+            double outputSpacing = height / (outputTypes.size() + 1.0);
+            double outputX = width - Config.PORT_OFFSET_X;
+            for (int i = 0; i < outputTypes.size(); i++) {
+                double yPos = (i + 1) * outputSpacing;
+                outputPorts.add(new Port(this, PortType.OUTPUT, outputTypes.get(i), new Point2D(outputX, yPos)));
+            }
         }
     }
 
     public void receivePacket(Packet packet, GameState gameState) {
         if (packet == null || gameState == null) return;
-        packet.setCurrentConnection(null);
-        packet.setTargetPort(null);
-        packet.setProgressOnConnection(0.0);
-        packet.getVelocity().set(0, 0);
-        packet.setAcceleration(0);
+        packet.setCurrentConnection(null); packet.setTargetPort(null);
+        packet.setProgressOnConnection(0.0); packet.getVelocity().set(0, 0); packet.setAcceleration(0);
 
         if (storedPackets.size() < Config.SYSTEM_PACKET_STORAGE_CAPACITY) {
             storedPackets.add(packet);
-            int coinsToAdd = (packet.getType() == PacketType.SQUARE) ? 1 : 2;
-            gameState.addCoin(coinsToAdd);
-            System.out.println("Packet received & stored: " + packet.getType() + ". Added " + coinsToAdd + " coins. Total: " + gameState.getCoins());
+            gameState.addCoin(packet.getType() == PacketType.SQUARE ? 1 : 2);
         } else {
             gameState.incrementPacketLoss(1);
             System.out.println("Packet discarded, storage full: " + packet.getType());
@@ -68,34 +68,20 @@ public class SystemNode {
         this.setIndicatorOn(!storedPackets.isEmpty());
     }
 
-    public void requeuePacket(Packet packet) {
-        if (packet != null && !storedPackets.contains(packet)) {
-            if (storedPackets.size() < Config.SYSTEM_PACKET_STORAGE_CAPACITY) {
-                storedPackets.add(0, packet);
-            }
-        }
-    }
-
     public void update(double deltaTime, GameState gameState) {
         this.setIndicatorOn(!storedPackets.isEmpty());
-
         if (!storedPackets.isEmpty()) {
             Packet packetToSend = storedPackets.get(0);
-
             Connection connToSendOn = findAvailableConnectionFromSystem(this, gameState);
-
-            if (connToSendOn != null) {
+            if (connToSendOn != null && !isConnectionOccupied(connToSendOn, gameState)) {
                 storedPackets.remove(0);
                 packetToSend.startMoving(connToSendOn);
                 gameState.addPacket(packetToSend);
                 this.setIndicatorOn(!storedPackets.isEmpty());
-                System.out.println("System " + this.hashCode() % 1000 + " sending packet: " + packetToSend.getType() +
-                        " via port type: " + connToSendOn.getStartPort().getPacketType());
+                System.out.println("System " + this.hashCode() % 1000 + " sent packet: " + packetToSend.getType());
+                return;
             }
         }
-    }
-    public boolean isStorageFull() {
-        return storedPackets.size() >= Config.SYSTEM_PACKET_STORAGE_CAPACITY;
     }
 
     private Connection findAvailableConnectionFromSystem(SystemNode system, GameState state) {
@@ -111,7 +97,6 @@ public class SystemNode {
         }
         return null;
     }
-
 
     private Connection findConnectionFromPort(Port port, GameState gameState) {
         if (port == null || port.getType() != PortType.OUTPUT || gameState == null) return null;
@@ -133,6 +118,9 @@ public class SystemNode {
         return false;
     }
 
+    public boolean isStorageFull() {
+        return storedPackets.size() >= Config.SYSTEM_PACKET_STORAGE_CAPACITY;
+    }
     public int getStoredPacketCount() {
         return storedPackets.size();
     }
@@ -143,6 +131,6 @@ public class SystemNode {
     public List<Port> getInputPorts() { return Collections.unmodifiableList(inputPorts); }
     public List<Port> getOutputPorts() { return Collections.unmodifiableList(outputPorts); }
     public boolean isIndicatorOn() { return indicatorOn; }
-
     public void setIndicatorOn(boolean indicatorOn) { this.indicatorOn = indicatorOn; }
+
 }

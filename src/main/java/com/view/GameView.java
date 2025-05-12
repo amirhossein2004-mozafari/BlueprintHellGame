@@ -170,32 +170,43 @@ public class GameView extends Pane {
 
     private void drawSinglePacket(Packet packet) {
         Node packetNode = packetNodes.get(packet);
+        Label sizeLabel = packet.getSizeLabel();
+
         if (packetNode == null) {
             packetNode = createPacketNode(packet);
             if (packetNode != null) {
                 packet.setVisualNode(packetNode);
                 this.getChildren().add(packetNode);
                 packetNodes.put(packet, packetNode);
+
+                if (sizeLabel != null && !this.getChildren().contains(sizeLabel)) {
+                    this.getChildren().add(sizeLabel);
+                    packet.updateLabelPosition();
+                }
             }
         }
     }
 
     private Node createPacketNode(Packet packet) {
-        double size = Config.PACKET_SIZE;
+        double size;
         double x = packet.getX();
         double y = packet.getY();
         Node node = null;
+
         if (packet.getType() == PacketType.SQUARE) {
+            size = Config.PORT_VISUAL_SIZE_SQUARE * 2;
             Rectangle rect = new Rectangle(x - size / 2.0, y - size / 2.0, size, size);
             rect.setFill(Config.COLOR_PACKET_SQUARE);
             node = rect;
         } else if (packet.getType() == PacketType.TRIANGLE) {
+            size = Config.PORT_VISUAL_SIZE_TRIANGLE * 1.8;
             Polygon poly = new Polygon();
             double height = size * Math.sqrt(3) / 2.0;
             poly.getPoints().addAll( x, y - height * (2.0/3.0), x - size / 2.0, y + height * (1.0/3.0), x + size / 2.0, y + height * (1.0/3.0) );
             poly.setFill(Config.COLOR_PACKET_TRIANGLE);
             node = poly;
         }
+
         if(node instanceof Shape) { ((Shape)node).setStroke(Color.DARKSLATEGRAY); ((Shape)node).setStrokeWidth(0.5); }
         return node;
     }
@@ -227,9 +238,14 @@ public class GameView extends Pane {
     public void updatePacketPositions(GameState gameState) {
         for (Packet packet : gameState.getPackets()) {
             Node node = packetNodes.get(packet);
+            Label label = packet.getSizeLabel();
+
             if (node != null) {
                 node.relocate(packet.getX() - node.getBoundsInLocal().getWidth() / 2.0,
                         packet.getY() - node.getBoundsInLocal().getHeight() / 2.0);
+                if (label != null) {
+                    packet.updateLabelPosition();
+                }
             } else {
                 drawSinglePacket(packet);
             }
@@ -238,6 +254,10 @@ public class GameView extends Pane {
         packetNodes.entrySet().removeIf(entry -> {
             if (!currentPackets.contains(entry.getKey())) {
                 this.getChildren().remove(entry.getValue());
+                Label labelToRemove = entry.getKey().getSizeLabel();
+                if (labelToRemove != null) {
+                    this.getChildren().remove(labelToRemove);
+                }
                 return true;
             }
             return false;
