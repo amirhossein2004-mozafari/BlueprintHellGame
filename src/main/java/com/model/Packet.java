@@ -172,16 +172,16 @@ public class Packet {
 
     public void applyImpactForce(Vector2D force) {
         if (this.velocity == null) this.velocity = new Vector2D();
+        this.velocity.add(Vector2D.multiply(force, 0.3));
 
-        double forceMag = force.magnitude();
+        double maxSpeedAfterImpact = Config.BASE_PACKET_SPEED * 1.2;
+        if (this.velocity.magnitudeSquared() > maxSpeedAfterImpact * maxSpeedAfterImpact) {
+            this.velocity.normalize().multiply(maxSpeedAfterImpact);
+        }
 
-
-        this.velocity.add(force);
-        this.stabilityOnWire = Math.max(0, this.stabilityOnWire - (forceMag / Config.COLLISION_IMPACT_BASE_FORCE) * Config.PACKET_STABILITY_REDUCTION_FACTOR);
-
+        this.stabilityOnWire = Math.max(0, this.stabilityOnWire - Config.PACKET_STABILITY_REDUCTION_FACTOR);
         if (this.stabilityOnWire <= 0.01 && !isOffWire) {
             System.out.println("Packet stability depleted by impact. Now off-wire.");
-            isOffWire = true;
         }
         this.acceleration = 0;
     }
@@ -217,15 +217,15 @@ public class Packet {
 
     public void addNoise(double receivedNoise) {
         if (receivedNoise > 0) {
-            this.stabilityOnWire = Math.max(0, this.stabilityOnWire - receivedNoise * Config.PACKET_NOISE_TO_STABILITY_FACTOR);
-            if (this.sizeLabel != null && Config.COLOR_HUD_TEXT != null) {
-                double G = Math.max(0, 1.0 - noiseLevel - receivedNoise);
-                this.sizeLabel.setTextFill(Color.rgb(255, (int)(G * 200) + 55, (int)(G*150)+55));
-            }
-            if (this.stabilityOnWire <= 0.01 && !isOffWire) {
-                System.out.println("Packet " + type + " stability depleted by noise. Becoming off-wire.");
-            }
+            this.noiseLevel = Math.min(1.0, this.noiseLevel + receivedNoise);
+            if(this.stabilityOnWire <= 0.01 && !isOffWire) isOffWire = true;
+            System.out.println("Packet at (...) noise added to: " + String.format("%.2f", this.noiseLevel));
         }
+    }
+
+    public void setNoiseLevel(double level) {
+        this.noiseLevel = Math.max(0, Math.min(1.0, level));
+        System.out.println("Packet noise set to: " + String.format("%.2f", this.noiseLevel));
     }
 
     public PacketType getType() { return type; }

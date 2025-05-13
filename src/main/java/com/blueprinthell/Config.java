@@ -8,13 +8,15 @@ public final class Config {
 
     public static final double WINDOW_WIDTH = 1024;
     public static final double WINDOW_HEIGHT = 768;
+    public static final double HUD_HEIGHT = 30.0;
+
 
     public static final double STAGE_DURATION_SECONDS = 60.0;
 
     public static final double MAX_PACKET_LOSS_PERCENTAGE = 50.0;
     public static final double INITIAL_WIRE_LENGTH = 5000.0;
     public static final int SYSTEM_PACKET_STORAGE_CAPACITY = 5;
-    public static final double COLLISION_DEVIATION_THRESHOLD = 10.0;
+    public static final double COLLISION_DEVIATION_THRESHOLD = 15.0;
     public static final int COINS_PER_PACKET_DELIVERED = 1;
 
     public static final double BASE_PACKET_SPEED = 100.0;
@@ -22,12 +24,12 @@ public final class Config {
     public static final double SPEED_FACTOR_INCOMPATIBLE_START = 0.5;
 
 
-    public static final double COLLISION_IMPACT_RADIUS = 120.0;
-    public static final double COLLISION_IMPACT_BASE_FORCE = 200.0;
-    public static final double PACKET_STABILITY_REDUCTION_FACTOR = 0.3;
-    public static final double PACKET_NOISE_TO_STABILITY_FACTOR = 0.2;
-    public static final double WIRE_RETURN_FORCE_STRENGTH = 0.8;
-    public static final double OFF_WIRE_FRICTION = 0.985;
+    public static final double COLLISION_IMPACT_RADIUS = 100.0;
+    public static final double COLLISION_IMPACT_BASE_FORCE = 100.0;
+    public static final double PACKET_STABILITY_REDUCTION_FACTOR = 0.15;
+    public static final double PACKET_NOISE_TO_STABILITY_FACTOR = 0.1;
+    public static final double WIRE_RETURN_FORCE_STRENGTH = 0.6;
+    public static final double OFF_WIRE_FRICTION = 0.99;
 
     public static final int ATAR_SKILL_COST = 3;
     public static final int AIRYAMAN_SKILL_COST = 4;

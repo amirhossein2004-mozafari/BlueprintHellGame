@@ -98,28 +98,48 @@ public class GameController {
     }
 
     public void updateGame(double scaledDeltaTime) {
-        if (gameState == null || mainApp == null) return;
+        if (gameState == null || mainApp == null) {
+            System.err.println("GameState or MainApplication is null in updateGame. Aborting update.");
+            return;
+        }
+
+        if (gameState.isGameLogicPaused()) {
+            return;
+        }
 
         if (gameState.isLevelTimeUp()) {
             if (gameState.getPackets().isEmpty()) {
-                System.out.println("Level Time Up! No more packets. Ending level.");
+                System.out.println("Level Time Up! No more packets to process. Ending level via Game Over.");
                 mainApp.showGameOver(false, gameState.getCoins(), gameState.getPacketLossCount());
                 return;
             } else {
-                System.out.println("Level Time Up! Waiting for remaining packets...");
             }
         }
+
+        gameState.incrementGameTime(scaledDeltaTime);
+
+        gameState.updateActiveSkills(scaledDeltaTime);
 
         if (gameState.canSpawnMorePackets() && !gameState.isLevelTimeUp()) {
             spawnNewPackets(scaledDeltaTime);
         }
 
-        CollisionDetector.checkPacketPacketCollisions(gameState, gameState.getPackets());
+        if (gameState.getPackets() != null && !gameState.isSkillActive(ShopSkill.AIRYAMAN)) {
+            CollisionDetector.checkPacketPacketCollisions(gameState, gameState.getPackets());
+        }
 
-        handlePacketMovementAndArrival(scaledDeltaTime);
-        updateSystemLogic(scaledDeltaTime);
+        if (gameState.getPackets() != null) {
+            handlePacketMovementAndArrival(scaledDeltaTime);
+        }
 
-        gameView.updatePacketPositions(gameState);
+        if (gameState.getSystems() != null) {
+            updateSystemLogic(scaledDeltaTime);
+        }
+
+        if (gameView != null) {
+            gameView.updatePacketPositions(gameState);
+        }
+
         checkEndConditions();
     }
 
@@ -509,8 +529,20 @@ public class GameController {
         return false;
     }
 
-    public void pauseGameLogic() { System.out.println("Game Logic Paused"); }
-    public void resumeGameLogic() { System.out.println("Game Logic Resumed"); }
+    public void pauseGameLogic() {
+        if (gameState != null) {
+            gameState.setGameLogicPaused(true);
+            System.out.println("Game Logic Paused (by GameController call)");
+        }
+    }
+
+    public void resumeGameLogic() {
+        if (gameState != null) {
+            gameState.setGameLogicPaused(false);
+            System.out.println("Game Logic Resumed by Controller");
+        }
+    }
+
     public void pauseGame() { System.out.println("Game Paused"); }
     public void resumeGame() { System.out.println("Game Resumed"); }
 }
