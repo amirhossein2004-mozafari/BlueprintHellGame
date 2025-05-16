@@ -21,7 +21,7 @@ public class GameView extends Pane {
     private final Map<Port, Shape> portShapes = new HashMap<>();
 
     public GameView(double width, double height) {
-        this.setPrefSize(width, height);
+        this.setPrefSize(width / 2, height);
         this.setMinSize(width, height);
         this.setMaxSize(width, height);
         this.setStyle("-fx-background-color: #" + Config.COLOR_BACKGROUND.toString().substring(2) + ";");

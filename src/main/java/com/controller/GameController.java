@@ -6,15 +6,14 @@ import com.view.GameView;
 import com.blueprinthell.MainApplication;
 
 import javafx.geometry.Point2D;
-import javafx.scene.Node;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.shape.Line;
-import javafx.scene.shape.Shape;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.stream.Collectors;
 
 public class GameController {
 
@@ -45,101 +44,51 @@ public class GameController {
         gameState.clearPackets();
         gameState.clearConnections();
 
+        gameState.addSystem(new SystemNode(100, 150, SystemRole.SOURCE, 0, 0, 2, 2));
 
-        double sw = Config.SYSTEM_WIDTH;
-        double sh = Config.SYSTEM_HEIGHT;
-        double margin = 100;
-        double midX = Config.WINDOW_WIDTH / 2.0;
-        double midY = Config.WINDOW_HEIGHT / 2.0;
+        gameState.addSystem(new SystemNode(400, 100, SystemRole.INTERMEDIATE, 1, 1, 1, 0));
 
-        SystemNode sys0_Source = new SystemNode(margin, margin,
-                List.of(),
-                List.of(PacketType.SQUARE, PacketType.TRIANGLE, PacketType.SQUARE));
-        gameState.addSystem(sys0_Source);
-        SystemNode sys1_TR = new SystemNode(Config.WINDOW_WIDTH - margin - sw, margin,
-                List.of(PacketType.SQUARE, PacketType.TRIANGLE),
-                List.of(PacketType.SQUARE, PacketType.TRIANGLE));
-        gameState.addSystem(sys1_TR);
+        gameState.addSystem(new SystemNode(700, 200, SystemRole.INTERMEDIATE, 1, 2, 2, 1));
 
-        SystemNode sys2_MidTop = new SystemNode(midX - sw - 30, midY - sh / 2.0 - 30,
-                List.of(PacketType.SQUARE, PacketType.TRIANGLE, PacketType.SQUARE),
-                List.of(PacketType.TRIANGLE, PacketType.SQUARE, PacketType.TRIANGLE));
-        gameState.addSystem(sys2_MidTop);
+        gameState.addSystem(new SystemNode(170, 400, SystemRole.INTERMEDIATE, 2, 0, 1, 1));
 
-        SystemNode sys3_MidBottom = new SystemNode(midX + 30, midY + sh / 2.0 - 30,
-                List.of(PacketType.TRIANGLE, PacketType.SQUARE, PacketType.TRIANGLE),
-                List.of(PacketType.SQUARE, PacketType.SQUARE, PacketType.TRIANGLE));
-        gameState.addSystem(sys3_MidBottom);
+        gameState.addSystem(new SystemNode(380, 300, SystemRole.INTERMEDIATE, 1, 1, 1, 2));
 
+        gameState.addSystem(new SystemNode(680, 430, SystemRole.INTERMEDIATE, 1, 1, 1, 0));
 
-        SystemNode sys4_LeftMid = new SystemNode(margin + sw + 60, midY - sh / 2,
-                List.of(PacketType.SQUARE, PacketType.SQUARE, PacketType.TRIANGLE),
-                List.of(PacketType.TRIANGLE, PacketType.SQUARE));
-        gameState.addSystem(sys4_LeftMid);
+        gameState.addSystem(new SystemNode(300, 550, SystemRole.SINK, 1, 1, 0, 0));
 
-        SystemNode sys5_RightMid = new SystemNode(Config.WINDOW_WIDTH - margin - 2*sw - 60, midY - sh / 2,
-                List.of(PacketType.TRIANGLE, PacketType.TRIANGLE, PacketType.SQUARE),
-                List.of(PacketType.SQUARE, PacketType.TRIANGLE));
-        gameState.addSystem(sys5_RightMid);
-
-
-        SystemNode sys6_SinkLeft = new SystemNode(margin, Config.WINDOW_HEIGHT - margin - sh,
-                List.of(PacketType.SQUARE, PacketType.TRIANGLE, PacketType.SQUARE),
-                List.of());
-        gameState.addSystem(sys6_SinkLeft);
-
-        SystemNode sys7_SinkRight = new SystemNode(Config.WINDOW_WIDTH - margin - sw, Config.WINDOW_HEIGHT - margin - sh,
-                List.of(PacketType.TRIANGLE, PacketType.SQUARE, PacketType.SQUARE),
-                List.of());
-        gameState.addSystem(sys7_SinkRight);
+        gameState.addSystem(new SystemNode(650, 520, SystemRole.SINK, 1, 0, 0, 0));
 
         gameView.redrawAll(gameState);
-        System.out.println("Game Initialized with " + gameState.getSystems().size() + " systems (defined roles).");
+        checkAndSetAllPortsConnected();
+        System.out.println("Game Initialized. All ports connected: " + gameState.areAllPortsConnected());
     }
 
     public void updateGame(double scaledDeltaTime) {
-        if (gameState == null || mainApp == null) {
-            System.err.println("GameState or MainApplication is null in updateGame. Aborting update.");
+        if (gameState == null || mainApp == null || gameState.isGameLogicPaused()) return;
+
+        if (!gameState.isGameRunning()) {
             return;
         }
-
-        if (gameState.isGameLogicPaused()) {
+        if (gameState.isLevelTimeUp() && gameState.getPackets().isEmpty()) {
+            System.out.println("Level Time Up & No Packets! Ending level.");
+            mainApp.showGameOver(false, gameState.getCoins(), gameState.getPacketLossCount());
             return;
         }
-
-        if (gameState.isLevelTimeUp()) {
-            if (gameState.getPackets().isEmpty()) {
-                System.out.println("Level Time Up! No more packets to process. Ending level via Game Over.");
-                mainApp.showGameOver(false, gameState.getCoins(), gameState.getPacketLossCount());
-                return;
-            } else {
-            }
-        }
-
         gameState.incrementGameTime(scaledDeltaTime);
-
         gameState.updateActiveSkills(scaledDeltaTime);
 
         if (gameState.canSpawnMorePackets() && !gameState.isLevelTimeUp()) {
             spawnNewPackets(scaledDeltaTime);
         }
 
-        if (gameState.getPackets() != null && !gameState.isSkillActive(ShopSkill.AIRYAMAN)) {
+        if (!gameState.isSkillActive(ShopSkill.AIRYAMAN)) {
             CollisionDetector.checkPacketPacketCollisions(gameState, gameState.getPackets());
         }
-
-        if (gameState.getPackets() != null) {
-            handlePacketMovementAndArrival(scaledDeltaTime);
-        }
-
-        if (gameState.getSystems() != null) {
-            updateSystemLogic(scaledDeltaTime);
-        }
-
-        if (gameView != null) {
-            gameView.updatePacketPositions(gameState);
-        }
-
+        handlePacketMovementAndArrival(scaledDeltaTime);
+        updateSystemLogic(scaledDeltaTime);
+        gameView.updatePacketPositions(gameState);
         checkEndConditions();
     }
 
@@ -151,88 +100,91 @@ public class GameController {
 
             timeSinceLastPacket = 0.0;
 
-            SystemNode sourceSystem = null;
-            if (!gameState.getSystems().isEmpty()) {
-                List<SystemNode> potentialSources = new ArrayList<>();
-                for(SystemNode sys : gameState.getSystems()){
-                    if(sys.getInputPorts().isEmpty() && !sys.getOutputPorts().isEmpty()){
-                        potentialSources.add(sys);
-                    }
-                }
-                if(potentialSources.isEmpty() && !gameState.getSystems().isEmpty()){
-                    potentialSources.add(gameState.getSystems().get(0));
-                }
-
-                if(!potentialSources.isEmpty()){
-                    sourceSystem = potentialSources.get(random.nextInt(potentialSources.size()));
-                }
-            }
+            SystemNode sourceSystem = findRandomSourceSystem(gameState);
 
             if (sourceSystem != null && !sourceSystem.getOutputPorts().isEmpty()) {
-                Port sourcePort = sourceSystem.getOutputPorts().get(random.nextInt(sourceSystem.getOutputPorts().size()));
+                Connection startConnection = findAnyAvailableConnectionFromSystem(sourceSystem, gameState);
 
-                Connection startConnection = findConnectionFromPort(sourcePort, gameState);
-
-                if (startConnection != null && !isConnectionOccupied(startConnection, gameState)) {
-                    PacketType typeToSpawn = sourcePort.getPacketType();
+                if (startConnection != null) {
+                    PacketType typeToSpawn = random.nextBoolean() ? PacketType.SQUARE : PacketType.TRIANGLE;
 
                     Packet newPacket = new Packet(typeToSpawn, startConnection.getStartPort().getAbsoluteX(), startConnection.getStartPort().getAbsoluteY());
 
                     if (gameState.getPackets().size() < 50) {
                         newPacket.startMoving(startConnection);
                         gameState.addPacket(newPacket);
+                        System.out.println("Spawned packet: " + typeToSpawn + " from System " + sourceSystem.hashCode()%1000 +
+                                " on PortType: " + startConnection.getStartPort().getPacketType());
                     }
-                } else {
-
                 }
-            } else {
-
             }
         }
     }
 
+    private SystemNode findRandomSourceSystem(GameState state) {
+        List<SystemNode> sourceSystems = state.getSystems().stream()
+                .filter(s -> s.getRole() == SystemRole.SOURCE && !s.getOutputPorts().isEmpty())
+                .collect(Collectors.toList());
+        if (!sourceSystems.isEmpty()) {
+            return sourceSystems.get(random.nextInt(sourceSystems.size()));
+        }
+        for (SystemNode sys : state.getSystems()) {
+            if (!sys.getOutputPorts().isEmpty()) return sys;
+        }
+        return null;
+    }
 
+    private Connection findAnyAvailableConnectionFromSystem(SystemNode system, GameState state) {
+        List<Connection> availableConnections = new ArrayList<>();
+        if (system == null) return null;
+        for (Port port : system.getOutputPorts()) {
+            Connection conn = findConnectionFromPort(port, state);
+            if (conn != null && !isConnectionOccupied(conn, state)) {
+                availableConnections.add(conn);
+            }
+        }
+        if (!availableConnections.isEmpty()) {
+            return availableConnections.get(random.nextInt(availableConnections.size()));
+        }
+        return null;
+    }
 
     private void handlePacketMovementAndArrival(double scaledDeltaTime) {
-        if (gameState == null || gameState.getPackets() == null) return;
-
-        List<Packet> packetsToRemoveFromGameState = new ArrayList<>();
-
+        List<Packet> packetsToRemove = new ArrayList<>();
         for (Packet packet : new ArrayList<>(gameState.getPackets())) {
             if (packet.getCurrentSize() <= 0) {
-                System.out.println("Packet " + packet.getType() + " (ID: " + packet.hashCode() % 1000 + ") size became 0 - Considered Lost.");
                 gameState.incrementPacketLoss(1);
-                packetsToRemoveFromGameState.add(packet);
+                packetsToRemove.add(packet);
+                System.out.println("Packet depleted and lost.");
                 continue;
             }
 
-            boolean reachedTargetPortOnWire = packet.update(scaledDeltaTime);
+            boolean reachedEnd = packet.update(scaledDeltaTime);
 
-            if (reachedTargetPortOnWire) {
+            if (reachedEnd && !packet.isOffWire()) {
                 Port destinationPort = packet.getTargetPort();
                 if (destinationPort != null && destinationPort.getParentSystem() != null) {
                     SystemNode destinationSystem = destinationPort.getParentSystem();
                     destinationSystem.receivePacket(packet, gameState);
+                    if (destinationSystem.getRole() == SystemRole.SINK) {
+                        System.out.println("Packet " + packet.getType() + " reached a SINK system!");
+                    }
                 } else {
                     gameState.incrementPacketLoss(1);
-                    System.out.println("Packet " + packet.getType() + " (ID: " + packet.hashCode() % 1000 + ") lost - reached end of an invalid/disconnected wire segment.");
+                    System.out.println("Packet lost - wire leads to invalid target.");
                 }
-                packetsToRemoveFromGameState.add(packet);
+                packetsToRemove.add(packet);
             } else if (packet.isOffWire()) {
-                double boundsCheckOffset = Math.max(Config.PORT_VISUAL_SIZE_SQUARE, Config.PORT_VISUAL_SIZE_TRIANGLE) * 2.0;
-
-                if (packet.getX() < -boundsCheckOffset || packet.getX() > Config.WINDOW_WIDTH + boundsCheckOffset ||
-                        packet.getY() < -boundsCheckOffset || packet.getY() > Config.WINDOW_HEIGHT + boundsCheckOffset) {
-                    System.out.println("Off-wire packet " + packet.getType() + " (ID: " + packet.hashCode() % 1000 + ") went OUT OF BOUNDS. Lost.");
+                double boundsOffset = Config.SYSTEM_WIDTH;
+                if (packet.getX() < -boundsOffset || packet.getX() > Config.WINDOW_WIDTH + boundsOffset ||
+                        packet.getY() < -boundsOffset || packet.getY() > Config.WINDOW_HEIGHT + boundsOffset) {
                     gameState.incrementPacketLoss(1);
-                    packetsToRemoveFromGameState.add(packet);
+                    packetsToRemove.add(packet);
+                    System.out.println("Off-wire packet went OUT OF BOUNDS and lost.");
                 }
             }
         }
-
-        for (Packet packetToRemove : packetsToRemoveFromGameState) {
-            gameState.removePacket(packetToRemove);
-        }
+        for (Packet p : packetsToRemove) gameState.removePacket(p);
     }
 
 
@@ -304,12 +256,17 @@ public class GameController {
 
     private void checkEndConditions() {
         if (gameState.getTotalPacketsSpawned() > 0) {
-            double lossPercentage = gameState.getPacketLossPercentage();
-            if (lossPercentage >= Config.MAX_PACKET_LOSS_PERCENTAGE) {
-                System.out.println("--- GAME OVER --- Packet Loss Reached Limit!");
-                if (mainApp != null) {
-                    mainApp.showGameOver(false, gameState.getCoins(), gameState.getPacketLossCount());
-                }
+            if (gameState.getPacketLossPercentage() >= Config.MAX_PACKET_LOSS_PERCENTAGE) {
+                System.out.println("GAME OVER - Packet Loss limit reached!");
+                mainApp.showGameOver(false, gameState.getCoins(), gameState.getPacketLossCount());
+            }
+        }
+
+        if (gameState.isLevelTimeUp() && !gameState.canSpawnMorePackets() && gameState.getPackets().isEmpty()) {
+            System.out.println("Level time up and all spawned packets processed. Calculating result...");
+            if(gameState.getPacketLossPercentage() < Config.MAX_PACKET_LOSS_PERCENTAGE) {
+                System.out.println("Level WON (Time up, loss within limits). Implement proper win condition logic.");
+            } else {
             }
         }
     }
@@ -415,10 +372,31 @@ public class GameController {
             tempWire = null;
         }
         gameView.redrawAll(gameState);
+        checkAndSetAllPortsConnected();
 
-        if (!connectionMadeSuccessfully && (event.getEventType() == MouseEvent.MOUSE_RELEASED && wiringStartPort == null  )) {
+        System.out.println("Mouse Release. All ports connected: " + gameState.areAllPortsConnected());
+    }
 
+    private void checkAndSetAllPortsConnected() {
+        if (gameState == null || gameState.getSystems().isEmpty()) {
+            gameState.updateAllPortsConnectedStatus(false);
+            return;
         }
+        for (SystemNode system : gameState.getSystems()) {
+            for (Port port : system.getInputPorts()) {
+                if (!port.isConnected()) {
+                    gameState.updateAllPortsConnectedStatus(false);
+                    return;
+                }
+            }
+            for (Port port : system.getOutputPorts()) {
+                if (!port.isConnected()) {
+                    gameState.updateAllPortsConnectedStatus(false);
+                    return;
+                }
+            }
+        }
+        gameState.updateAllPortsConnectedStatus(true);
     }
 
     public void handleKeyPress(KeyCode code) {
@@ -486,6 +464,9 @@ public class GameController {
         if (targetPort.getType() != PortType.INPUT) {
             return false;
         }
+        if (startPort.getType() != PortType.OUTPUT) {
+            return false;
+        }
         if (startPort.getParentSystem() == targetPort.getParentSystem()) {
             return false;
         }
@@ -493,7 +474,7 @@ public class GameController {
             return false;
         }
 
-        if (targetPort.getParentSystem().isStorageFull()) {
+        if (targetPort.getParentSystem().isStorageFull() && targetPort.getParentSystem().getRole() != SystemRole.SINK) {
             System.out.println("Validation fail: Target system storage is FULL.");
             return false;
         }
@@ -515,8 +496,12 @@ public class GameController {
         return null;
     }
 
-    private Connection findConnectionFromPort(Port port, GameState state) {
-        for(Connection conn : state.getConnections()){ if(conn.getStartPort() == port){ return conn; }} return null;
+    private Connection findConnectionFromPort(Port port, GameState gameState) {
+        if (port == null || gameState == null) return null;
+        for(Connection conn : gameState.getConnections()){
+            if(conn.getStartPort() == port){ return conn; }
+        }
+        return null;
     }
 
     private boolean isConnectionOccupied(Connection connection, GameState gameState) {
@@ -543,6 +528,14 @@ public class GameController {
         }
     }
 
-    public void pauseGame() { System.out.println("Game Paused"); }
-    public void resumeGame() { System.out.println("Game Resumed"); }
+    public void pauseGame() {
+        System.out.println("GameController: Requesting Full Game Pause.");
+        pauseGameLogic();
+    }
+
+    public void resumeGame() {
+        System.out.println("GameController: Requesting Full Game Resume.");
+        resumeGameLogic();
+    }
+
 }

@@ -3,20 +3,19 @@ package com.blueprinthell;
 import com.controller.*;
 import com.model.GameState;
 import com.view.*;
-import com.controller.ShopController;
-import com.view.ShopView;
-
 import javafx.application.Application;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
 import javafx.scene.input.KeyCode;
-import javafx.scene.layout.StackPane;
-import javafx.stage.Stage;
-import java.io.IOException;
-import java.util.Objects;
 import javafx.scene.layout.BorderPane;
+import javafx.stage.Stage;
+import java.util.Objects;
+import javafx.scene.layout.Pane;
+import javafx.scene.shape.Rectangle;
+import javafx.scene.paint.Color;
+
 
 public class MainApplication extends Application {
 
@@ -32,7 +31,8 @@ public class MainApplication extends Application {
         this.primaryStage = stage;
         primaryStage.setTitle("Blueprint Hell");
         primaryStage.setResizable(false);
-        startGame(1);
+        MenuController menuController = new MenuController(this);
+        showMainMenu(menuController);
         primaryStage.show();
     }
 
@@ -46,7 +46,16 @@ public class MainApplication extends Application {
 
     public void showMainMenu(MenuController controller) {
         stopCurrentGameLoop();
-        System.out.println("Show Main Menu ");
+
+        if (controller == null) {
+            System.err.println("MainApp Error: MenuController is null for showMainMenu.");
+            return;
+        }
+        MenuView menuView = new MenuView(controller);
+        Scene menuScene = new Scene(menuView, Config.WINDOW_WIDTH, Config.WINDOW_HEIGHT);
+        applyStylesheet(menuScene, "/styles/style.css");
+        primaryStage.setScene(menuScene);
+        System.out.println("Main Menu shown.");
     }
 
     public void startGame(int levelNumber) {
@@ -127,67 +136,83 @@ public class MainApplication extends Application {
         }
     }
 
-    public void showSettings() { stopCurrentGameLoop(); System.out.println("Show Settings - NIY."); }
-
+    public void showSettings() {
+        stopCurrentGameLoop();
+        System.out.println("Show Settings called - View not implemented yet.");
+        showMainMenu(new MenuController(this));
+    }
     public void showShop() {
         if (gameState == null || gameController == null) {
-            System.err.println("Cannot show shop: GameState or GameController is null.");
+            System.err.println("MainApp: Cannot show shop - GameState or GameController is null.");
             return;
         }
 
-        if (!gameState.isGameLogicPaused()) {
-            gameController.pauseGameLogic();
+        System.out.println("--- Attempting to show RED Test Rectangle ---");
 
-            if (shopViewInstance == null) {
-                ShopController shopCtrl = new ShopController(this, gameState, gameController);
-                shopViewInstance = new ShopView(shopCtrl, gameState);
-            } else {
-                shopViewInstance.updateAvailableCoins(gameState.getCoins());
+        if (!gameState.isGameLogicPaused()) {
+            System.out.println("MainApp: Pausing game logic to show test rect.");
+            gameController.pauseGameLogic();
+            if (gameLoop != null) gameLoop.stop();
+
+            if (!gameState.isGameLogicPaused()){
+                System.err.println("MainApp Warning: Game logic did not pause as expected. Forcing pause.");
+                gameState.setGameLogicPaused(true);
             }
 
             if (primaryStage.getScene().getRoot() instanceof BorderPane rootNode) {
-                if (rootNode.getCenter() == shopViewInstance) rootNode.setCenter(null);
-                if (rootNode.getRight() == shopViewInstance) rootNode.setRight(null);
+                System.out.println("MainApp: Root is BorderPane. Creating RED test rectangle.");
+                Rectangle testRect = new Rectangle(250, 300, Color.RED);
+                testRect.setStroke(Color.YELLOW);
+                testRect.setStrokeWidth(3);
 
-                rootNode.setRight(shopViewInstance);
-                shopViewInstance.setVisible(true);
-                System.out.println("ShopView set to BorderPane right side.");
+                if (rootNode.getRight() != null) {
+                    System.out.println("MainApp: Clearing previous content from BorderPane.right.");
+                    rootNode.setRight(null);
+                }
+
+                rootNode.setRight(testRect);
+                testRect.setVisible(true);
+
+                System.out.println("MainApp: RED Test Rectangle should be on the right side and visible.");
+                javafx.application.Platform.runLater(() -> {
+                    System.out.println("MainApp (runLater): TestRect actual size: " + testRect.getWidth() + "x" + testRect.getHeight());
+                    System.out.println("MainApp (runLater): TestRect parent: " + testRect.getParent());
+                    System.out.println("MainApp (runLater): RootNode right child: " + rootNode.getRight());
+                });
+
             } else {
-                System.err.println("Cannot show shop: Root node is not a BorderPane to set right child.");
+                System.err.println("MainApp: Cannot show test rect - Root node is not a BorderPane.");
                 gameController.resumeGameLogic();
             }
         } else {
-            System.out.println("Shop key pressed, but game logic already paused. Shop might be open or other pause.");
-            if(shopViewInstance != null && shopViewInstance.isVisible()){
-                hideShop();
-            }
+            System.out.println("MainApp: Shop key pressed, but game logic already paused.");
         }
     }
 
     public void hideShop() {
         if (gameState == null || gameController == null) return;
-
-        if (primaryStage.getScene().getRoot() instanceof BorderPane rootNode && shopViewInstance != null) {
-            if (rootNode.getRight() == shopViewInstance) {
+        System.out.println("--- Attempting to hide (remove RED Test Rectangle) ---");
+        if (primaryStage.getScene().getRoot() instanceof BorderPane rootNode) {
+            if (rootNode.getRight() instanceof Rectangle) {
                 rootNode.setRight(null);
-                System.out.println("ShopView removed from BorderPane right side.");
+                System.out.println("MainApp: RED Test Rectangle removed from BorderPane right side.");
             }
-            shopViewInstance.setVisible(false);
         }
-
         if (gameState.isGameLogicPaused()) {
+            System.out.println("MainApp: Resuming game logic after attempting to hide element.");
             gameController.resumeGameLogic();
+            if (gameLoop != null && !gameState.isGameRunning()) {
+            } else if (gameLoop != null && gameState.isGameRunning()){
+                System.out.println("MainApp: GameLoop was running, consider if it needs restart from here.");
+            }
         }
     }
 
-    public ShopView getShopViewInstance() {
-        return shopViewInstance;
-    }
-
+    public ShopView getShopViewInstance() { return shopViewInstance; }
     public void showGameOver(boolean success, int score, int packetsLost) {
         stopCurrentGameLoop();
-        System.out.println(">>>> GAME OVER! Success: " + success + " | Score: " + score + " | Packets Lost: " + packetsLost + " <<<<");    }
-
+        System.out.println(">>>> GAME OVER! Success: " + success + " | Score: " + score + " | Packets Lost: " + packetsLost + " <<<<");
+    }
     public Stage getPrimaryStage() { return primaryStage; }
     public GameState getGameState() { return gameState; }
 

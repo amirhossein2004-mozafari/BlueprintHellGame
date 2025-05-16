@@ -23,6 +23,9 @@ public class Connection {
         this.endPort = endPort;
         this.length = new Point2D(startPort.getAbsoluteX(), startPort.getAbsoluteY())
                 .distance(endPort.getAbsoluteX(), endPort.getAbsoluteY());
+
+        startPort.setConnectedConnection(this);
+        endPort.setConnectedConnection(this);
     }
 
     public String getId() {

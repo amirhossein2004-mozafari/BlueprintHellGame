@@ -41,6 +41,8 @@ public final class Config {
     public static final double MAX_TIME_SCALE = 3.0;
     public static final double MIN_TIME_SCALE = 0.1;
     public static final double DEFAULT_TIME_SCALE = 1.0;
+    public static final double SHOP_VIEW_DEFAULT_WIDTH = 300;
+    public static final double SHOP_VIEW_DEFAULT_HEIGHT = 280;
 
     public static final Duration HUD_AUTO_HIDE_DELAY = Duration.seconds(3);
 

@@ -9,6 +9,7 @@ import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
@@ -40,6 +41,9 @@ public class GameState {
     private final Map<ShopSkill, DoubleProperty> activeSkillsDuration;
     private final BooleanProperty isGameLogicPaused;
 
+    private final BooleanProperty isGameRunning;
+    private final BooleanProperty allPortsConnectedProperty;
+
     public GameState(int packetsToSpawnInLevel, double levelDurationSeconds) {
         this.systems = new ArrayList<>();
         this.packets = new ArrayList<>();
@@ -61,10 +65,14 @@ public class GameState {
         this.isGameLogicPaused = new SimpleBooleanProperty(false);
         this.packetsToSpawnInLevel = packetsToSpawnInLevel;
         this.levelDurationSeconds = levelDurationSeconds;
+        this.isGameRunning = new SimpleBooleanProperty(false);
+        this.allPortsConnectedProperty = new SimpleBooleanProperty(false);
     }
 
     public GameState() {
         this(30, 90.0);
+        this.isGameRunning.set(false);
+        this.allPortsConnectedProperty.set(false);
     }
 
     public void addSystem(SystemNode system) { if (system != null) this.systems.add(system); }
@@ -89,13 +97,16 @@ public class GameState {
         this.packetsSpawnedThisLevelProperty.set(0);
         this.gameTimeElapsedSeconds = 0.0;
         this.gameTimeElapsedSecondsProperty.set(0.0);
+        this.isGameRunning.set(false);
     }
 
     public void addConnection(Connection connection) { if (connection != null) this.connections.add(connection); }
     public List<Connection> getConnections() { return Collections.unmodifiableList(connections); }
+
     public void clearConnections() {
         this.connections.clear();
         this.remainingWireLength.set(Config.INITIAL_WIRE_LENGTH);
+        this.updateAllPortsConnectedStatus(false);
     }
 
     public void incrementGameTime(double deltaTime) {
@@ -120,6 +131,7 @@ public class GameState {
         } return false;
     }
 
+
     public void addCoin(int amount) { if (amount > 0) this.coins.set(this.coins.get() + amount); }
     public int getCoins() { return coins.get(); }
     public IntegerProperty coinsProperty() { return coins; }
@@ -142,6 +154,31 @@ public class GameState {
         this.currentTimeScale.set(newScale);
     }
     public DoubleProperty currentTimeScaleProperty() { return currentTimeScale; }
+
+
+    public boolean isGameRunning() {
+        return isGameRunning.get();
+    }
+
+    public void setGameRunning(boolean running) {
+        isGameRunning.set(running);
+    }
+
+    public BooleanProperty gameRunningProperty() {
+        return isGameRunning;
+    }
+
+    public boolean areAllPortsConnected() {
+        return allPortsConnectedProperty.get();
+    }
+    public void updateAllPortsConnectedStatus(boolean status) {
+        this.allPortsConnectedProperty.set(status);
+    }
+
+    public BooleanProperty allPortsConnectedProperty() {
+        return allPortsConnectedProperty;
+    }
+
 
     public void activateSkill(ShopSkill skill, double durationSeconds) {
         if (skill == null) return;
