@@ -40,33 +40,22 @@ public class GameController {
 
 
     public void initializeGame() {
-        gameState.clearSystems();
         gameState.clearPackets();
         gameState.clearConnections();
-
-        gameState.addSystem(new SystemNode(100, 150, SystemRole.SOURCE, 0, 0, 2, 2));
-
-        gameState.addSystem(new SystemNode(400, 100, SystemRole.INTERMEDIATE, 1, 1, 1, 0));
-
-        gameState.addSystem(new SystemNode(700, 200, SystemRole.INTERMEDIATE, 1, 2, 2, 1));
-
-        gameState.addSystem(new SystemNode(170, 400, SystemRole.INTERMEDIATE, 2, 0, 1, 1));
-
-        gameState.addSystem(new SystemNode(380, 300, SystemRole.INTERMEDIATE, 1, 1, 1, 2));
-
-        gameState.addSystem(new SystemNode(680, 430, SystemRole.INTERMEDIATE, 1, 1, 1, 0));
-
-        gameState.addSystem(new SystemNode(300, 550, SystemRole.SINK, 1, 1, 0, 0));
-
-        gameState.addSystem(new SystemNode(650, 520, SystemRole.SINK, 1, 0, 0, 0));
-
-        gameView.redrawAll(gameState);
+        if (gameView != null && gameState != null) {
+            gameView.redrawAll(gameState);
+            System.out.println("GameController.initializeGame: GameView redrawn with systems from loaded level.");
+        } else {
+            System.err.println("GameController.initializeGame: GameView or GameState is null. Cannot redraw.");
+        }
         checkAndSetAllPortsConnected();
-        System.out.println("Game Initialized. All ports connected: " + gameState.areAllPortsConnected());
+        System.out.println("Game Initialized based on loaded level. All ports connected: " + gameState.areAllPortsConnected());
     }
 
     public void updateGame(double scaledDeltaTime) {
-        if (gameState == null || mainApp == null || gameState.isGameLogicPaused()) return;
+        if (gameState == null || mainApp == null || gameState.isGameLogicPaused() || !gameState.isGameRunning()) {
+            return;
+        }
 
         if (!gameState.isGameRunning()) {
             return;

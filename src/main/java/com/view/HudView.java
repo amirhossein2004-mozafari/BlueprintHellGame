@@ -23,6 +23,8 @@ public class HudView extends HBox {
     private final Label coinsLabel;
     private final Label lossLabel;
     private final Button startGameButton;
+    private final Label timeElapsedLabel;
+    private final Label currentLevelLabel;
 
     private static final double METER_WIDTH = 130.0;
     private static final double METER_HEIGHT = 14.0;
@@ -75,6 +77,27 @@ public class HudView extends HBox {
         );
         wireMeterPane.getChildren().addAll(backgroundRect, remainingWireRect);
 
+
+        currentLevelLabel = new Label();
+        currentLevelLabel.setFont(Font.font("Arial", FontWeight.BOLD, 12));
+        currentLevelLabel.setTextFill(Config.COLOR_HUD_TEXT);
+        currentLevelLabel.textProperty().bind(
+                Bindings.format("مرحله: %d", gameState.currentLevelNumberProperty())
+        );
+
+        timeElapsedLabel = new Label();
+        timeElapsedLabel.setFont(Font.font("Arial", FontWeight.BOLD, 12));
+        timeElapsedLabel.setTextFill(Config.COLOR_HUD_TEXT);
+        timeElapsedLabel.textProperty().bind(
+                Bindings.createStringBinding(() -> {
+                    double secondsElapsed = gameState.getGameTimeElapsedSeconds();
+                    int minutes = (int) (secondsElapsed / 60);
+                    int seconds = (int) (secondsElapsed % 60);
+                    return String.format("زمان: %02d:%02d", minutes, seconds);
+                }, gameState.gameTimeElapsedSecondsProperty())
+        );
+
+
         wireLengthLabel = new Label();
         wireLengthLabel.setFont(Font.font("Arial", FontWeight.BOLD, 11));
         wireLengthLabel.setTextFill(Config.COLOR_HUD_TEXT);
@@ -101,14 +124,19 @@ public class HudView extends HBox {
                         gameState.totalPacketsSpawnedProperty(),
                         gameState.packetLossPercentageProperty()
                 ));
-        HBox statsGroup = new HBox(10, coinsLabel, lossLabel);
+
+        HBox topLeftInfo = new HBox(15, currentLevelLabel, timeElapsedLabel);
+        topLeftInfo.setAlignment(Pos.CENTER_LEFT);
+
+        HBox statsGroup = new HBox(15, coinsLabel, lossLabel);
         statsGroup.setAlignment(Pos.CENTER_LEFT);
 
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
+        Region spacer1 = new Region();
+        HBox.setHgrow(spacer1, Priority.ALWAYS);
+        Region spacer2 = new Region();
 
-
-        this.getChildren().addAll(startGameButton, wireGroup, spacer, statsGroup);
+        this.getChildren().clear();
+        this.getChildren().addAll(topLeftInfo, wireGroup, spacer1, statsGroup, spacer2, startGameButton);
 
         this.setVisible(true);
         this.setMouseTransparent(false);

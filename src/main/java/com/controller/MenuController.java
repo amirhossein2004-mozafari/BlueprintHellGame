@@ -6,16 +6,20 @@ public class MenuController {
     private final MainApplication mainApp;
 
     public MenuController(MainApplication mainApp) {
+        if (mainApp == null) {
+            throw new IllegalArgumentException("MainApplication cannot be null for MenuController");
+        }
         this.mainApp = mainApp;
     }
 
-    public void handleStartGameButton() {
-        System.out.println("Menu: Start Game button pressed.");
-        mainApp.startGame(1);
+    public void handleStartGameButton(int levelNumber) {
+        System.out.println("Menu: Start Game (Level " + levelNumber + ") button pressed.");
+        mainApp.startGame(levelNumber);
     }
 
     public void handleSelectLevelButton() {
-        System.out.println("Menu: Select Level button pressed - Not implemented yet.");
+        System.out.println("Menu: Select Level button pressed.");
+        mainApp.showLevelSelectionScreen(this);
     }
 
     public void handleSettingsButton() {
@@ -25,6 +29,8 @@ public class MenuController {
 
     public void handleExitButton() {
         System.out.println("Menu: Exit button pressed.");
-        mainApp.getPrimaryStage().close();
+        if (mainApp != null && mainApp.getPrimaryStage() != null) {
+            mainApp.getPrimaryStage().close();
+        }
     }
 }

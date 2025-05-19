@@ -4,133 +4,172 @@ import com.blueprinthell.Config;
 import com.controller.ShopController;
 import com.model.GameState;
 import com.model.ShopSkill;
-
-import javafx.beans.binding.Bindings;
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.SimpleBooleanProperty;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
-import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
-import javafx.scene.text.FontPosture;
 import javafx.scene.text.FontWeight;
+import javafx.scene.paint.Color;
+import javafx.beans.binding.Bindings;
 
 public class ShopView extends BorderPane {
 
-    private final Label coinsAvailableLabel;
-    private static final double SHOP_PREF_WIDTH = 320;
-    private static final double SHOP_PREF_HEIGHT = 300;
+    private final ShopController shopController;
+    private final GameState gameState;
 
     public ShopView(ShopController shopController, GameState gameState) {
         if (shopController == null || gameState == null) {
-            throw new IllegalArgumentException("ShopController and GameState cannot be null");
+            throw new IllegalArgumentException("ShopController and GameState cannot be null for ShopView");
         }
+        this.shopController = shopController;
+        this.gameState = gameState;
 
-        this.setPrefSize(SHOP_PREF_WIDTH, SHOP_PREF_HEIGHT);
-        this.setMinWidth(SHOP_PREF_WIDTH / 1.5);
-        this.setMinHeight(SHOP_PREF_HEIGHT / 1.5);
-        this.setStyle("-fx-background-color: " + toRGBCode(Config.COLOR_SHOP_BACKGROUND) + ";" +
-                "-fx-border-color: #999999; -fx-border-width: 1.5; -fx-background-radius: 10; -fx-border-radius: 10;");
+        this.setPrefWidth(Config.SHOP_VIEW_DEFAULT_WIDTH);
+        this.setMinWidth(Config.SHOP_VIEW_DEFAULT_WIDTH);
+        this.setMaxWidth(Config.SHOP_VIEW_DEFAULT_WIDTH);
+
+        this.setPrefHeight(Config.SHOP_VIEW_DEFAULT_HEIGHT);
+        this.setMinHeight(Config.SHOP_VIEW_DEFAULT_HEIGHT * 0.8);
+
+
+        this.setStyle("-fx-background-color: " + formatColorToCss(Config.COLOR_SHOP_BACKGROUND) + ";" +
+                "-fx-border-color: " + formatColorToCss(Config.COLOR_SHOP_BUTTON_HOVER) + ";" +
+                "-fx-border-width: 2; -fx-background-radius: 5; -fx-border-radius: 5;");
         this.setPadding(new Insets(15));
 
-        Label title = new Label("فروشگاه مهارت‌ها");
-        title.setFont(Font.font("Arial", FontWeight.BOLD, 20));
-        title.setTextFill(Config.COLOR_SHOP_TEXT);
-        title.setAlignment(Pos.CENTER);
-        BorderPane.setAlignment(title, Pos.CENTER);
-        this.setTop(title);
+        VBox mainLayout = new VBox(15);
+        mainLayout.setAlignment(Pos.TOP_CENTER);
 
-        VBox skillsBox = new VBox(10);
-        skillsBox.setAlignment(Pos.TOP_LEFT);
-        skillsBox.setPadding(new Insets(10, 0, 10, 0));
+        Label shopTitle = new Label("فروشگاه");
+        shopTitle.setFont(Font.font("Arial", FontWeight.BOLD, 22));
+        shopTitle.setTextFill(Config.COLOR_SHOP_TEXT);
 
-        skillsBox.getChildren().add(createSkillButton(
-                gameState, "غیرفعال کردن Impact موج ضربه (10ث)", Config.ATAR_SKILL_COST,
-                () -> shopController.buySkill(ShopSkill.ATAR, Config.ATAR_SKILL_DURATION_SECONDS, Config.ATAR_SKILL_COST)
-        ));
-        skillsBox.getChildren().add(createSkillButton(
-                gameState, "غیرفعال کردن برخورد پکت (5ث)", Config.AIRYAMAN_SKILL_COST,
-                () -> shopController.buySkill(ShopSkill.AIRYAMAN, Config.AIRYAMAN_SKILL_DURATION_SECONDS, Config.AIRYAMAN_SKILL_COST)
-        ));
-        skillsBox.getChildren().add(createSkillButton(
-                gameState, "پاک کردن نویز همه پکت‌ها (آنی)", Config.ANAHITA_SKILL_COST,
-                () -> shopController.buySkill(ShopSkill.ANAHITA, 0, Config.ANAHITA_SKILL_COST)
-        ));
-
-        this.setCenter(skillsBox);
-
-        HBox bottomControls = new HBox(10);
-        bottomControls.setAlignment(Pos.CENTER_RIGHT);
-        bottomControls.setPadding(new Insets(15, 0, 0, 0));
-
-        coinsAvailableLabel = new Label();
-        coinsAvailableLabel.setFont(Font.font("Arial", FontWeight.BOLD, 14));
-        coinsAvailableLabel.setTextFill(Color.GOLD);
-        coinsAvailableLabel.textProperty().bind(
-                Bindings.format("سکه: %d", gameState.coinsProperty())
+        Label currentCoinsLabel = new Label();
+        currentCoinsLabel.setFont(Font.font("Arial", FontWeight.BOLD, 16));
+        currentCoinsLabel.setTextFill(Color.GOLD);
+        currentCoinsLabel.textProperty().bind(
+                Bindings.format("سکه های شما: %d", gameState.coinsProperty())
         );
 
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
+        VBox skillsContainer = new VBox(10);
+        skillsContainer.setAlignment(Pos.CENTER_LEFT);
+        skillsContainer.setPadding(new Insets(5,0,15,0));
 
-        Button closeButton = new Button("بستن (ESC)");
-        closeButton.setFont(Font.font("Arial", FontWeight.BOLD, 12));
-        closeButton.setOnAction(e -> shopController.closeShop());
 
-        bottomControls.getChildren().addAll(coinsAvailableLabel, spacer, closeButton);
-        this.setBottom(bottomControls);
+        skillsContainer.getChildren().add(createSkillEntryView(
+                "اَتَر (Atar)",
+                "اثر موج‌های Impact را برای " + (int)Config.ATAR_SKILL_DURATION_SECONDS + " ثانیه غیرفعال می‌کند.",
+                Config.ATAR_SKILL_COST,
+                ShopSkill.ATAR,
+                Config.ATAR_SKILL_DURATION_SECONDS,
+                gameState.atarSkillActiveProperty()
+        ));
+
+        skillsContainer.getChildren().add(createSkillEntryView(
+                "اَیریامَن (Airyaman)",
+                "برخورد پاکت‌های موجود در شبکه را برای " + (int)Config.AIRYAMAN_SKILL_DURATION_SECONDS + " ثانیه غیرفعال می‌کند.",
+                Config.AIRYAMAN_SKILL_COST,
+                ShopSkill.AIRYAMAN,
+                Config.AIRYAMAN_SKILL_DURATION_SECONDS,
+                gameState.airyamanSkillActiveProperty()
+        ));
+
+        skillsContainer.getChildren().add(createSkillEntryView(
+                "آناهیتا (Anahita)",
+                "نویز تمام پاکت‌های حاضر در شبکه را صفر می‌کند.",
+                Config.ANAHITA_SKILL_COST,
+                ShopSkill.ANAHITA,
+                0,
+                null
+        ));
+
+
+        Button closeButton = new Button("بستن فروشگاه (ESC)");
+        styleButton(closeButton);
+        closeButton.setOnAction(e -> this.shopController.closeShop());
+
+
+        mainLayout.getChildren().addAll(shopTitle, currentCoinsLabel, skillsContainer, closeButton);
+        this.setCenter(mainLayout);
+        System.out.println("ShopView: UI fully constructed with all skill entries.");
     }
 
-    private HBox createSkillButton(GameState gameState, String description, int cost, Runnable onAction) {
-        HBox itemRow = new HBox(10);
-        itemRow.setAlignment(Pos.CENTER_LEFT);
-        itemRow.setPadding(new Insets(3, 0, 3, 0));
+    private VBox createSkillEntryView(String name, String description, int cost, ShopSkill skillEnum, double duration, BooleanProperty activeProperty) {
+        VBox skillBox = new VBox(5);
+        skillBox.setPadding(new Insets(10));
+        skillBox.setAlignment(Pos.CENTER_LEFT);
+        skillBox.setStyle("-fx-background-color: " + formatColorToCss(Config.COLOR_SHOP_BUTTON.deriveColor(0,1,1,0.3)) +";" +
+                "-fx-border-color: " + formatColorToCss(Config.COLOR_SHOP_BUTTON) + "; -fx-border-width: 1; -fx-border-radius: 4;");
+
+        Label nameLabel = new Label(name);
+        nameLabel.setFont(Font.font("Arial", FontWeight.BOLD, 16));
+        nameLabel.setTextFill(Config.COLOR_SHOP_TEXT);
+
+        Label costLabel = new Label("قیمت: " + cost + " سکه");
+        costLabel.setFont(Font.font("Arial", FontWeight.NORMAL, 13));
+        costLabel.setTextFill(Config.COLOR_SHOP_TEXT);
 
         Label descLabel = new Label(description);
-        descLabel.setFont(Font.font("Arial", FontPosture.REGULAR, 12));
+        descLabel.setFont(Font.font("Arial", FontWeight.NORMAL, 12));
         descLabel.setTextFill(Config.COLOR_SHOP_TEXT);
         descLabel.setWrapText(true);
-        descLabel.setPrefWidth(180);
-        descLabel.setMaxWidth(180);
-
-        Label costLabel = new Label("هزینه: " + cost);
-        costLabel.setFont(Font.font("Arial", FontWeight.NORMAL, 11));
-        costLabel.setTextFill(Color.LIGHTCYAN);
-
-        VBox textInfoContainer = new VBox(2, descLabel, costLabel);
-        textInfoContainer.setAlignment(Pos.CENTER_LEFT);
+        descLabel.setMaxWidth(Config.SHOP_VIEW_DEFAULT_WIDTH - 60);
 
         Button buyButton = new Button("خرید");
-        buyButton.setFont(Font.font("Arial", FontWeight.BOLD, 11));
-        buyButton.setMinWidth(50);
-        buyButton.setPrefWidth(60);
-        buyButton.setOnAction(e -> onAction.run());
+        styleButton(buyButton);
+        buyButton.setOnAction(e -> {
+            System.out.println("ShopView: Buy button clicked for " + skillEnum.name());
+            this.shopController.buySkill(skillEnum, duration, cost);
+        });
+
         buyButton.disableProperty().bind(
                 gameState.coinsProperty().lessThan(cost)
+                        .or( (activeProperty != null) ? activeProperty : new SimpleBooleanProperty(false) )
         );
 
-        itemRow.getChildren().addAll(textInfoContainer, buyButton);
-        HBox.setHgrow(textInfoContainer, Priority.ALWAYS);
-        return itemRow;
+        skillBox.getChildren().addAll(nameLabel, costLabel, descLabel, buyButton);
+        if (activeProperty != null) {
+            Label activeStatusLabel = new Label();
+            activeStatusLabel.setFont(Font.font("Arial", FontWeight.NORMAL, 11));
+            activeStatusLabel.textProperty().bind(Bindings.when(activeProperty)
+                    .then("وضعیت: فعال")
+                    .otherwise("وضعیت: غیرفعال"));
+            activeStatusLabel.textFillProperty().bind(Bindings.when(activeProperty)
+                    .then(Color.LIMEGREEN.darker())
+                    .otherwise(Color.ORANGERED.darker()));
+            skillBox.getChildren().add(activeStatusLabel);
+        }
+
+        return skillBox;
     }
 
-    private String toRGBCode(Color color) {
-        if (color == null) return "#20202AE5";
-        return String.format("#%02X%02X%02X%02X",
-                (int) (color.getRed() * 255),
-                (int) (color.getGreen() * 255),
-                (int) (color.getBlue() * 255),
-                (int) (color.getOpacity() * 255));
+    private void styleButton(Button button) {
+        button.setFont(Font.font("Arial", FontWeight.BOLD, 13));
+        String baseStyle = "-fx-background-color: " + formatColorToCss(Config.COLOR_SHOP_BUTTON) + "; -fx-text-fill: " + formatColorToCss(Config.COLOR_SHOP_TEXT) + "; -fx-background-radius: 3;";
+        String hoverStyle = "-fx-background-color: " + formatColorToCss(Config.COLOR_SHOP_BUTTON_HOVER) + "; -fx-text-fill: " + formatColorToCss(Config.COLOR_SHOP_TEXT) + "; -fx-background-radius: 3;";
+        button.setStyle(baseStyle);
+        button.setOnMouseEntered(e -> button.setStyle(hoverStyle));
+        button.setOnMouseExited(e -> button.setStyle(baseStyle));
     }
 
-    public void updateAvailableCoins(int coins) {
-        if (coinsAvailableLabel != null) {
-            coinsAvailableLabel.setText("سکه: " + coins);
+    private String formatColorToCss(Color color) {
+        if (color == null) return "transparent";
+        if (color.getOpacity() < 1.0) {
+            return String.format("rgba(%d, %d, %d, %.2f)",
+                    (int) (color.getRed() * 255),
+                    (int) (color.getGreen() * 255),
+                    (int) (color.getBlue() * 255),
+                    color.getOpacity());
+        } else {
+            return String.format("#%02X%02X%02X",
+                    (int) (color.getRed() * 255),
+                    (int) (color.getGreen() * 255),
+                    (int) (color.getBlue() * 255));
         }
     }
 }

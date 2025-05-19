@@ -2,14 +2,7 @@ package com.model;
 
 import com.blueprinthell.Config;
 import javafx.beans.binding.Bindings;
-import javafx.beans.property.BooleanProperty;
-import javafx.beans.property.DoubleProperty;
-import javafx.beans.property.IntegerProperty;
-import javafx.beans.property.SimpleBooleanProperty;
-import javafx.beans.property.SimpleDoubleProperty;
-import javafx.beans.property.SimpleIntegerProperty;
-
-
+import javafx.beans.property.*;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
@@ -30,97 +23,122 @@ public class GameState {
     private final DoubleProperty packetLossPercentage;
     private final DoubleProperty currentTimeScale;
 
-    private double gameTimeElapsedSeconds = 0.0;
-    private int packetsSpawnedThisLevel = 0;
     private final int packetsToSpawnInLevel;
     private final double levelDurationSeconds;
 
-    private final SimpleIntegerProperty packetsSpawnedThisLevelProperty = new SimpleIntegerProperty(0);
-    private final SimpleDoubleProperty gameTimeElapsedSecondsProperty = new SimpleDoubleProperty(0.0);
+    private final SimpleIntegerProperty packetsSpawnedThisLevelProperty;
+    private double gameTimeElapsedSeconds;
+    private final SimpleDoubleProperty gameTimeElapsedSecondsProperty;
 
     private final Map<ShopSkill, DoubleProperty> activeSkillsDuration;
     private final BooleanProperty isGameLogicPaused;
-
     private final BooleanProperty isGameRunning;
     private final BooleanProperty allPortsConnectedProperty;
+    private final IntegerProperty currentLevelNumberProperty;
 
-    public GameState(int packetsToSpawnInLevel, double levelDurationSeconds) {
+
+    public GameState(int levelNumber, int packetsToSpawnInLevel, double levelDurationSeconds) {
+        this.currentLevelNumberProperty = new SimpleIntegerProperty(levelNumber);
+        this.packetsToSpawnInLevel = packetsToSpawnInLevel;
+        this.levelDurationSeconds = levelDurationSeconds;
+
         this.systems = new ArrayList<>();
         this.packets = new ArrayList<>();
         this.connections = new ArrayList<>();
+
         this.remainingWireLength = new SimpleDoubleProperty(Config.INITIAL_WIRE_LENGTH);
         this.coins = new SimpleIntegerProperty(0);
         this.packetLossCount = new SimpleIntegerProperty(0);
         this.totalPacketsSpawned = new SimpleIntegerProperty(0);
         this.currentTimeScale = new SimpleDoubleProperty(Config.DEFAULT_TIME_SCALE);
+
         this.packetLossPercentage = new SimpleDoubleProperty(0.0);
         this.packetLossPercentage.bind(
-                Bindings.when(totalPacketsSpawned.greaterThan(0))
-                        .then(packetLossCount.multiply(100.0).divide(totalPacketsSpawned))
+                Bindings.when(this.totalPacketsSpawned.greaterThan(0))
+                        .then(this.packetLossCount.multiply(100.0).divide(this.totalPacketsSpawned))
                         .otherwise(0.0)
         );
-        this.gameTimeElapsedSecondsProperty.set(0);
-        this.packetsSpawnedThisLevelProperty.set(0);
+
+        this.packetsSpawnedThisLevelProperty = new SimpleIntegerProperty(0);
+        this.gameTimeElapsedSeconds = 0.0;
+        this.gameTimeElapsedSecondsProperty = new SimpleDoubleProperty(0.0);
+
         this.activeSkillsDuration = new EnumMap<>(ShopSkill.class);
+        for (ShopSkill skill : ShopSkill.values()) {
+            if (skill == ShopSkill.ATAR || skill == ShopSkill.AIRYAMAN) {
+                activeSkillsDuration.put(skill, new SimpleDoubleProperty(0.0));
+            }
+        }
+
         this.isGameLogicPaused = new SimpleBooleanProperty(false);
-        this.packetsToSpawnInLevel = packetsToSpawnInLevel;
-        this.levelDurationSeconds = levelDurationSeconds;
         this.isGameRunning = new SimpleBooleanProperty(false);
         this.allPortsConnectedProperty = new SimpleBooleanProperty(false);
+
+
+        System.out.println("GameState created for level: " + this.currentLevelNumberProperty.get() +
+                " with packetsToSpawn: " + this.packetsToSpawnInLevel +
+                ", duration: " + this.levelDurationSeconds);
     }
 
     public GameState() {
-        this(30, 90.0);
-        this.isGameRunning.set(false);
-        this.allPortsConnectedProperty.set(false);
+        this(1, 30, 90.0);
+        System.out.println("GameState created with default parameters (via no-arg constructor).");
     }
+
 
     public void addSystem(SystemNode system) { if (system != null) this.systems.add(system); }
     public List<SystemNode> getSystems() { return Collections.unmodifiableList(systems); }
-    public void clearSystems() { this.systems.clear(); }
+    public void clearSystems() {
+        this.systems.clear();
+        System.out.println("GameState: Systems cleared.");
+    }
 
     public void addPacket(Packet packet) {
         if (packet != null && !this.packets.contains(packet)) {
             this.packets.add(packet);
             this.totalPacketsSpawned.set(this.totalPacketsSpawned.get() + 1);
-            this.packetsSpawnedThisLevel++;
-            this.packetsSpawnedThisLevelProperty.set(this.packetsSpawnedThisLevel);
+            this.packetsSpawnedThisLevelProperty.set(this.packetsSpawnedThisLevelProperty.get() + 1);
         }
     }
     public void removePacket(Packet packet) { if (packet != null) this.packets.remove(packet); }
     public List<Packet> getPackets() { return Collections.unmodifiableList(packets); }
+
     public void clearPackets() {
         this.packets.clear();
         this.totalPacketsSpawned.set(0);
         this.packetLossCount.set(0);
-        this.packetsSpawnedThisLevel = 0;
         this.packetsSpawnedThisLevelProperty.set(0);
         this.gameTimeElapsedSeconds = 0.0;
         this.gameTimeElapsedSecondsProperty.set(0.0);
-        this.isGameRunning.set(false);
+        System.out.println("GameState: Packets cleared and related stats reset.");
     }
 
     public void addConnection(Connection connection) { if (connection != null) this.connections.add(connection); }
     public List<Connection> getConnections() { return Collections.unmodifiableList(connections); }
-
     public void clearConnections() {
         this.connections.clear();
         this.remainingWireLength.set(Config.INITIAL_WIRE_LENGTH);
         this.updateAllPortsConnectedStatus(false);
+        System.out.println("GameState: Connections cleared and wire length reset.");
     }
 
     public void incrementGameTime(double deltaTime) {
         this.gameTimeElapsedSeconds += deltaTime;
         this.gameTimeElapsedSecondsProperty.set(this.gameTimeElapsedSeconds);
     }
-    public boolean canSpawnMorePackets() { return packetsSpawnedThisLevel < packetsToSpawnInLevel; }
+
+    public boolean canSpawnMorePackets() { return packetsSpawnedThisLevelProperty.get() < packetsToSpawnInLevel; }
     public boolean isLevelTimeUp() { return gameTimeElapsedSeconds >= levelDurationSeconds; }
+
     public double getGameTimeElapsedSeconds() { return gameTimeElapsedSeconds; }
     public SimpleDoubleProperty gameTimeElapsedSecondsProperty() { return gameTimeElapsedSecondsProperty; }
-    public int getPacketsSpawnedThisLevel() { return packetsSpawnedThisLevel; }
+
+    public int getPacketsSpawnedThisLevel() { return packetsSpawnedThisLevelProperty.get(); }
     public SimpleIntegerProperty packetsSpawnedThisLevelProperty() { return packetsSpawnedThisLevelProperty; }
+
     public int getPacketsToSpawnInLevel() { return packetsToSpawnInLevel; }
     public double getLevelDurationSeconds() { return levelDurationSeconds; }
+
 
     public double getRemainingWireLength() { return remainingWireLength.get(); }
     public DoubleProperty remainingWireLengthProperty() { return remainingWireLength; }
@@ -130,7 +148,6 @@ public class GameState {
             return true;
         } return false;
     }
-
 
     public void addCoin(int amount) { if (amount > 0) this.coins.set(this.coins.get() + amount); }
     public int getCoins() { return coins.get(); }
@@ -155,30 +172,17 @@ public class GameState {
     }
     public DoubleProperty currentTimeScaleProperty() { return currentTimeScale; }
 
+    public boolean isGameRunning() { return isGameRunning.get(); }
+    public void setGameRunning(boolean running) { isGameRunning.set(running); }
+    public BooleanProperty gameRunningProperty() { return isGameRunning; }
 
-    public boolean isGameRunning() {
-        return isGameRunning.get();
-    }
+    public boolean areAllPortsConnected() { return allPortsConnectedProperty.get(); }
+    public void updateAllPortsConnectedStatus(boolean status) { allPortsConnectedProperty.set(status); }
+    public BooleanProperty allPortsConnectedProperty() { return allPortsConnectedProperty; }
 
-    public void setGameRunning(boolean running) {
-        isGameRunning.set(running);
-    }
 
-    public BooleanProperty gameRunningProperty() {
-        return isGameRunning;
-    }
-
-    public boolean areAllPortsConnected() {
-        return allPortsConnectedProperty.get();
-    }
-    public void updateAllPortsConnectedStatus(boolean status) {
-        this.allPortsConnectedProperty.set(status);
-    }
-
-    public BooleanProperty allPortsConnectedProperty() {
-        return allPortsConnectedProperty;
-    }
-
+    private final BooleanProperty atarSkillActiveProperty = new SimpleBooleanProperty(false);
+    private final BooleanProperty airyamanSkillActiveProperty = new SimpleBooleanProperty(false);
 
     public void activateSkill(ShopSkill skill, double durationSeconds) {
         if (skill == null) return;
@@ -187,9 +191,11 @@ public class GameState {
             System.out.println("Anahita skill activated! Noise cleared.");
             return;
         }
-        DoubleProperty currentDurationProp = activeSkillsDuration.computeIfAbsent(skill, k -> new SimpleDoubleProperty(0));
-        currentDurationProp.set(currentDurationProp.get() + durationSeconds);
-        System.out.println(skill.name() + " skill activated/extended. Duration: " + currentDurationProp.get());
+        DoubleProperty currentDurationProp = activeSkillsDuration.computeIfAbsent(skill, k -> new SimpleDoubleProperty(0.0));
+        currentDurationProp.set(durationSeconds);
+        if (skill == ShopSkill.ATAR) atarSkillActiveProperty.set(true);
+        if (skill == ShopSkill.AIRYAMAN) airyamanSkillActiveProperty.set(true);
+        System.out.println(skill.name() + " skill activated. Duration: " + currentDurationProp.get());
     }
 
     public boolean isSkillActive(ShopSkill skill) {
@@ -202,13 +208,18 @@ public class GameState {
         Iterator<Map.Entry<ShopSkill, DoubleProperty>> iterator = activeSkillsDuration.entrySet().iterator();
         while (iterator.hasNext()) {
             Map.Entry<ShopSkill, DoubleProperty> entry = iterator.next();
+            ShopSkill skill = entry.getKey();
             DoubleProperty durationProp = entry.getValue();
-            double newDuration = durationProp.get() - deltaTime;
-            if (newDuration <= 0) {
-                durationProp.set(0);
-                System.out.println(entry.getKey().name() + " skill expired.");
-            } else {
-                durationProp.set(newDuration);
+            if (durationProp.get() > 0) {
+                double newDuration = durationProp.get() - deltaTime;
+                if (newDuration <= 0) {
+                    durationProp.set(0);
+                    if (skill == ShopSkill.ATAR) atarSkillActiveProperty.set(false);
+                    if (skill == ShopSkill.AIRYAMAN) airyamanSkillActiveProperty.set(false);
+                    System.out.println(skill.name() + " skill expired.");
+                } else {
+                    durationProp.set(newDuration);
+                }
             }
         }
     }
@@ -228,10 +239,12 @@ public class GameState {
     }
 
     public boolean isGameLogicPaused() { return isGameLogicPaused.get(); }
-
-    public void setGameLogicPaused(boolean paused) {
-        this.isGameLogicPaused.set(paused);
-    }
-
+    public void setGameLogicPaused(boolean paused) { this.isGameLogicPaused.set(paused); }
     public BooleanProperty gameLogicPausedProperty() { return isGameLogicPaused; }
+
+    public BooleanProperty atarSkillActiveProperty() { return atarSkillActiveProperty; }
+    public BooleanProperty airyamanSkillActiveProperty() { return airyamanSkillActiveProperty; }
+
+    public IntegerProperty currentLevelNumberProperty() { return currentLevelNumberProperty; }
+    public int getCurrentLevelNumber() { return currentLevelNumberProperty.get(); }
 }

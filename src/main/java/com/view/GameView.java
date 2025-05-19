@@ -20,11 +20,12 @@ public class GameView extends Pane {
     private final Map<Packet, Node> packetNodes = new HashMap<>();
     private final Map<Port, Shape> portShapes = new HashMap<>();
 
-    public GameView(double width, double height) {
-        this.setPrefSize(width / 2, height);
-        this.setMinSize(width, height);
-        this.setMaxSize(width, height);
+    public GameView(double windowWidth, double gameAreaHeight) {
         this.setStyle("-fx-background-color: #" + Config.COLOR_BACKGROUND.toString().substring(2) + ";");
+        this.setPrefSize(windowWidth, gameAreaHeight);
+        this.setMinWidth(Math.max(0, windowWidth - Config.SHOP_VIEW_DEFAULT_WIDTH - 50));
+        this.setMaxSize(windowWidth, gameAreaHeight);
+        System.out.println("GameView constructed. PrefWidth: " + getPrefWidth() + " MinWidth: " + getMinWidth());
     }
 
     public void redrawAll(GameState gameState) {

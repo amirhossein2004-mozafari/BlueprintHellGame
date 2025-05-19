@@ -29,14 +29,11 @@ public class MenuView extends VBox {
         Label titleLabel = new Label("Blueprint Hell");
         titleLabel.setFont(Font.font("Arial", FontWeight.BOLD, 36));
         titleLabel.setTextFill(Config.COLOR_HUD_TEXT);
-
-        Button startGameButton = createMenuButton("شروع بازی / ادامه");
-        startGameButton.setOnAction(e -> controller.handleStartGameButton());
+        Button startGameButton = createMenuButton("شروع بازی (مرحله ۱)");
+        startGameButton.setOnAction(e -> controller.handleStartGameButton(1));
 
         Button selectLevelButton = createMenuButton("انتخاب مرحله");
         selectLevelButton.setOnAction(e -> controller.handleSelectLevelButton());
-        selectLevelButton.setDisable(true);
-
         Button settingsButton = createMenuButton("تنظیمات");
         settingsButton.setOnAction(e -> controller.handleSettingsButton());
 

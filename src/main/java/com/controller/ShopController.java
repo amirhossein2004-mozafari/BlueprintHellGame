@@ -11,7 +11,6 @@ public class ShopController {
     private final GameState gameState;
     private final GameController gameController;
 
-
     public ShopController(MainApplication mainApp, GameState gameState, GameController gameController) {
         this.mainApp = mainApp;
         this.gameState = gameState;
@@ -23,7 +22,6 @@ public class ShopController {
             if (gameState.decreaseCoins(cost)) {
                 gameState.activateSkill(skill, duration);
                 System.out.println("Skill " + skill.name() + " purchased!");
-                mainApp.getShopViewInstance().updateAvailableCoins(gameState.getCoins());
             } else {
                 System.out.println("Could not decrease coins, purchase failed.");
             }
@@ -33,7 +31,7 @@ public class ShopController {
     }
 
     public void closeShop() {
-        System.out.println("Closing shop.");
+        System.out.println("ShopController: Requesting to close shop via MainApplication.");
         mainApp.hideShop();
     }
 }
