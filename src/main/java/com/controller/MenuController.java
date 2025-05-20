@@ -24,7 +24,9 @@ public class MenuController {
 
     public void handleSettingsButton() {
         System.out.println("Menu: Settings button pressed.");
-        mainApp.showSettings();
+        if (mainApp != null) {
+            mainApp.showSettings();
+        }
     }
 
     public void handleExitButton() {

@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
+import com.utils.AudioManager;
 
 public class GameController {
 
@@ -310,23 +311,25 @@ public class GameController {
     public void handleMouseRelease(MouseEvent event) {
         boolean connectionMadeSuccessfully = false;
 
-        if (isWiring && wiringStartPort != null) {
+        if (isWiring && wiringStartPort != null && tempWire != null && gameState != null && gameView != null) {
             Point2D localReleaseCoords = gameView.sceneToLocal(event.getSceneX(), event.getSceneY());
 
             Port targetPort = findClickedPort(localReleaseCoords.getX(), localReleaseCoords.getY(), PortType.INPUT);
 
             System.out.println("MouseRelease - Attempting to connect from: " + wiringStartPort.getPacketType() +
-                    " on system " + wiringStartPort.getParentSystem().hashCode()%1000);
+                    " on system " + wiringStartPort.getParentSystem().hashCode() % 1000);
             if (targetPort != null) {
                 System.out.println("MouseRelease - Potential target port: " + targetPort.getPacketType() +
-                        " on system " + targetPort.getParentSystem().hashCode()%1000 +
-                        ", StorageFull: " + targetPort.getParentSystem().isStorageFull());
+                        " on system " + targetPort.getParentSystem().hashCode() % 1000 +
+                        ", IsConnected: " + targetPort.isConnected() +
+                        ", StorageFull (if not SINK): " + (targetPort.getParentSystem().getRole() != SystemRole.SINK && targetPort.getParentSystem().isStorageFull()));
             } else {
                 System.out.println("MouseRelease - No target port found at release point.");
             }
 
-
-            if (isValidConnectionAttempt(wiringStartPort, targetPort)) {
+            if (targetPort != null && targetPort.isConnected()) {
+                System.out.println("Wiring FAILED (in release): Target port is already connected to another wire.");
+            } else if (isValidConnectionAttempt(wiringStartPort, targetPort)) {
                 double requiredLength = new Point2D(wiringStartPort.getAbsoluteX(), wiringStartPort.getAbsoluteY())
                         .distance(targetPort.getAbsoluteX(), targetPort.getAbsoluteY());
 
@@ -335,10 +338,14 @@ public class GameController {
                         Connection newConnection = new Connection(wiringStartPort, targetPort);
                         gameState.addConnection(newConnection);
                         connectionMadeSuccessfully = true;
-                        System.out.println("Connection CREATED! Length: " + String.format("%.0f", requiredLength) +
+                        System.out.println("Connection CREATED! From Port (" + wiringStartPort.getPacketType() + ") to Port (" +
+                                targetPort.getPacketType() + "). Length: " + String.format("%.0f", requiredLength) +
                                 ", Remaining Wire: " + String.format("%.0f", gameState.getRemainingWireLength()));
+
+                        AudioManager.playSoundEffect(AudioManager.SFX_CONNECT_SUCCESS);
+
                     } else {
-                        System.out.println("Wiring FAILED (in release): Could not use wire (error in useWire logic).");
+                        System.out.println("Wiring FAILED (in release): Could not use wire (error in useWire logic despite available length).");
                     }
                 } else {
                     System.out.println("Wiring FAILED (in release): Not enough wire length. Required: " +
@@ -348,22 +355,29 @@ public class GameController {
             } else {
                 System.out.println("Wiring FAILED (in release): isValidConnectionAttempt returned false.");
                 if (targetPort == null) {
-                } else if (targetPort.getParentSystem().isStorageFull()) {
-                    System.out.println("Reason (explicit check): Target system storage is full.");
+                    System.out.println("Reason (isValid): Target port is null.");
+                } else if (targetPort.getType() != PortType.INPUT) {
+                    System.out.println("Reason (isValid): Target port is not an INPUT port.");
                 }
             }
+        } else {
+            if (!isWiring) System.out.println("MouseRelease: Not in wiring mode.");
+            if (wiringStartPort == null) System.out.println("MouseRelease: wiringStartPort is null.");
+            if (tempWire == null) System.out.println("MouseRelease: tempWire is null (might be normal if click was not on a port).");
         }
 
         isWiring = false;
         wiringStartPort = null;
         if (tempWire != null) {
-            gameView.removeNode(tempWire);
+            if (gameView != null) gameView.removeNode(tempWire);
             tempWire = null;
         }
-        gameView.redrawAll(gameState);
-        checkAndSetAllPortsConnected();
 
-        System.out.println("Mouse Release. All ports connected: " + gameState.areAllPortsConnected());
+        if (gameView != null && gameState != null) {
+            gameView.redrawAll(gameState);
+            checkAndSetAllPortsConnected();
+            System.out.println("Mouse Release completed. GameView redrawn. All ports connected status: " + gameState.areAllPortsConnected());
+        }
     }
 
     private void checkAndSetAllPortsConnected() {

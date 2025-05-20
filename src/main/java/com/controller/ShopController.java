@@ -4,6 +4,7 @@ import com.blueprinthell.Config;
 import com.blueprinthell.MainApplication;
 import com.model.GameState;
 import com.model.ShopSkill;
+import com.utils.AudioManager;
 
 public class ShopController {
 
@@ -18,20 +19,44 @@ public class ShopController {
     }
 
     public void buySkill(ShopSkill skill, double duration, int cost) {
+        if (gameState == null) {
+            System.err.println("ShopController Error: GameState is null. Cannot process skill purchase.");
+            return;
+        }
+
+        System.out.println("ShopController: Attempting to buy skill - " + skill.name() +
+                ", Cost: " + cost + ", Current Coins: " + gameState.getCoins());
+
         if (gameState.getCoins() >= cost) {
+            if ((skill == ShopSkill.ATAR && gameState.isSkillActive(ShopSkill.ATAR)) ||
+                    (skill == ShopSkill.AIRYAMAN && gameState.isSkillActive(ShopSkill.AIRYAMAN))) {
+                System.out.println("ShopController: Skill " + skill.name() + " is already active. Purchase aborted by controller.");
+                return;
+            }
+
             if (gameState.decreaseCoins(cost)) {
                 gameState.activateSkill(skill, duration);
-                System.out.println("Skill " + skill.name() + " purchased!");
+
+                AudioManager.playSoundEffect(AudioManager.SFX_SHOP_BUY);
+
+                System.out.println("ShopController: Skill " + skill.name() + " purchased and activated successfully!");
+
             } else {
-                System.out.println("Could not decrease coins, purchase failed.");
+                System.err.println("ShopController Error: Could not decrease coins for skill " + skill.name() +
+                        " even though player had enough. Purchase failed.");
             }
         } else {
-            System.out.println("Not enough coins to buy " + skill.name());
+            System.out.println("ShopController: Not enough coins to buy " + skill.name() +
+                    ". Required: " + cost + ", Available: " + gameState.getCoins());
         }
     }
 
     public void closeShop() {
         System.out.println("ShopController: Requesting to close shop via MainApplication.");
-        mainApp.hideShop();
+        if (mainApp != null) {
+            mainApp.hideShop();
+        } else {
+            System.err.println("ShopController Error: mainApp reference is null. Cannot close shop.");
+        }
     }
 }

@@ -20,6 +20,9 @@ import com.controller.ShopController;
 import com.view.ShopView;
 import javafx.scene.layout.BorderPane;
 import com.view.LevelSelectionView;
+import com.utils.AudioManager;
+import com.view.SettingsView;
+import com.controller.SettingsController;
 
 public class MainApplication extends Application {
 
@@ -32,12 +35,16 @@ public class MainApplication extends Application {
     private ShopView shopViewInstance = null;
     private ShopController shopControllerInstance = null;
     private int currentLevelNumber = 0;
+    private SettingsController settingsControllerInstance;
 
     @Override
     public void start(Stage stage) {
+        this.settingsControllerInstance = new SettingsController();
         this.primaryStage = stage;
         primaryStage.setTitle("Blueprint Hell");
         primaryStage.setResizable(false);
+        AudioManager.loadSounds();
+        AudioManager.playMenuBackgroundMusic(true);
         MenuController menuController = new MenuController(this);
         showMainMenu(menuController);
         primaryStage.show();
@@ -86,6 +93,7 @@ public class MainApplication extends Application {
         applyStylesheet(menuScene, "/styles/style.css");
         primaryStage.setScene(menuScene);
         System.out.println("Main Menu shown.");
+        AudioManager.playMenuBackgroundMusic(true);
     }
 
     public void startGame(int levelNumber) {
@@ -125,6 +133,7 @@ public class MainApplication extends Application {
         this.gameLoop.start();
         primaryStage.setScene(gameScene);
         System.out.println("startGame: Game scene for level " + levelNumber + " set.");
+        AudioManager.playGameBackgroundMusic(true);
     }
 
 
@@ -228,18 +237,21 @@ public class MainApplication extends Application {
             scene.getStylesheets().add(cssPath);
             System.out.println("Stylesheet " + cssResourcePath + " applied successfully.");
         } catch (NullPointerException e) {
-            System.err.println("Warning: Could not load stylesheet " + cssResourcePath + ". Ensure it's in the correct resources path.");
             e.printStackTrace();
         } catch (Exception e) {
-            System.err.println("Error applying stylesheet " + cssResourcePath + ": " + e.getMessage());
             e.printStackTrace();
         }
     }
 
     public void showSettings() {
         stopCurrentGameLoop();
-        System.out.println("Show Settings called - View not implemented yet.");
-        showMainMenu(new MenuController(this));
+        System.out.println("Attempting to show Settings Screen...");
+        MenuController currentMenuController = new MenuController(this);
+        SettingsView settingsView = new SettingsView(this, settingsControllerInstance, currentMenuController);
+        Scene settingsScene = new Scene(settingsView, Config.WINDOW_WIDTH, Config.WINDOW_HEIGHT);
+        applyStylesheet(settingsScene, "/styles/style.css");
+        primaryStage.setScene(settingsScene);
+        System.out.println("Settings Screen shown.");
     }
 
     public void showShop() {
@@ -338,15 +350,12 @@ public class MainApplication extends Application {
     public ShopView getShopViewInstance() { return shopViewInstance; }
 
     public void showGameOver(boolean success, int score, int packetsLost) {
-        System.out.println("MainApplication: showGameOver called. Success: " + success + ", Score: " + score + ", Lost: " + packetsLost + ", CurrentLevel: " + currentLevelNumber);
-        stopCurrentGameLoop();
-
-        GameOverView gameOverView = new GameOverView(this, success, score, packetsLost, this.currentLevelNumber);
-        Scene gameOverScene = new Scene(gameOverView, Config.WINDOW_WIDTH, Config.WINDOW_HEIGHT);
-        applyStylesheet(gameOverScene, "/styles/style.css");
-
-        primaryStage.setScene(gameOverScene);
-        System.out.println("Game Over/Win screen shown.");
+        AudioManager.stopBackgroundMusic();
+        if (success) {
+            AudioManager.playSoundEffect(AudioManager.SFX_LEVEL_COMPLETE);
+        } else {
+            AudioManager.playSoundEffect(AudioManager.SFX_GAME_OVER);
+        }
     }
 
     public Stage getPrimaryStage() { return primaryStage; }
