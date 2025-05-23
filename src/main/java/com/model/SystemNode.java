@@ -23,6 +23,7 @@ public class SystemNode {
     private final List<Packet> storedPackets;
     private boolean indicatorOn = false;
     private static final Random random = new Random();
+    private boolean allPortsActuallyConnected = false;
 
 
     public SystemNode(double x, double y, SystemRole role,
@@ -39,6 +40,7 @@ public class SystemNode {
 
         createSpecificPorts(numSquareInputs, numTriangleInputs, numSquareOutputs, numTriangleOutputs);
         validatePortsBasedOnRole();
+        updateAllPortsActuallyConnectedState();
     }
 
 
@@ -64,6 +66,38 @@ public class SystemNode {
                 createSpecificPorts(1, 1, 1, 1);
                 break;
         }
+    }
+
+    public void updateAllPortsActuallyConnectedState() {
+        boolean allInConnected = true;
+        if (!inputPorts.isEmpty()) {
+            for (Port port : inputPorts) {
+                if (!port.isConnected()) {
+                    allInConnected = false;
+                    break;
+                }
+            }
+        } else {
+            allInConnected = true;
+        }
+
+        boolean allOutConnected = true;
+        if (!outputPorts.isEmpty()) {
+            for (Port port : outputPorts) {
+                if (!port.isConnected()) {
+                    allOutConnected = false;
+                    break;
+                }
+            }
+        } else {
+            allOutConnected = true;
+        }
+
+        this.allPortsActuallyConnected = allInConnected && allOutConnected;
+    }
+
+    public boolean isAllPortsActuallyConnected() {
+        return allPortsActuallyConnected;
     }
 
     private void createSpecificPorts(int numSquareIn, int numTriangleIn, int numSquareOut, int numTriangleOut) {
@@ -104,49 +138,71 @@ public class SystemNode {
         }
     }
 
-
     public void receivePacket(Packet packet, GameState gameState) {
         if (packet == null || gameState == null) return;
 
-        packet.setCurrentConnection(null);
-        packet.setTargetPort(null);
-        packet.setStartPort(null);
-        packet.setProgressOnConnection(0.0);
-        packet.getVelocity().set(0, 0);
-        packet.setAcceleration(0);
+        boolean canAcceptPacket = (this.role == SystemRole.SINK) || (storedPackets.size() < Config.SYSTEM_PACKET_STORAGE_CAPACITY);
 
-        if (this.role == SystemRole.SINK || storedPackets.size() < Config.SYSTEM_PACKET_STORAGE_CAPACITY) {
-            if(this.role != SystemRole.SINK) {
+        if (canAcceptPacket) {
+            int coinsToAdd = (packet.getType() == PacketType.SQUARE) ? Config.COINS_PER_SQUARE_PACKET_SYSTEM_ENTRY : Config.COINS_PER_TRIANGLE_PACKET_SYSTEM_ENTRY;
+            gameState.addCoin(coinsToAdd);
+
+            if (this.role != SystemRole.SINK) {
+                packet.setInheritedStabilityDamage(1.0 - packet.getStabilityOnWire());
+                packet.getVelocity().set(0,0);
+                packet.setAcceleration(0);
+                packet.setCurrentConnection(null);
+                packet.setTargetPort(null);
+                packet.setStartPort(null);
+                packet.setProgressOnConnection(0);
                 storedPackets.add(packet);
-            }
-            gameState.addCoin(packet.getType() == PacketType.SQUARE ? 1 : 2);
-            System.out.println("Packet " + packet.getType() + " received by system " + (hashCode() % 1000) + " (Role: " + role + ")");
-            if (this.role == SystemRole.SINK) {
+            } else {
+                packet.setCurrentConnection(null);
+                packet.setTargetPort(null);
+                packet.setStartPort(null);
+                packet.setProgressOnConnection(1.0);
+
             }
         } else {
-            gameState.incrementPacketLoss(1);
-            System.out.println("Packet " + packet.getType() + " discarded by system " + (hashCode() % 1000) + " (INTERMEDIATE - storage full)");
+            gameState.registerCompletelyLostPacket(packet);
         }
-        updateIndicatorState();
     }
-
     public void update(double deltaTime, GameState gameState) {
-        updateIndicatorState();
-        if (role == SystemRole.SINK || role == SystemRole.SOURCE || storedPackets.isEmpty()) {
+        if (gameState == null || role == SystemRole.SINK || role == SystemRole.SOURCE || storedPackets.isEmpty()) {
             return;
         }
 
-        Packet packetToSend = storedPackets.get(0);
+        Packet packetToSend = null;
+        Connection connToSendOn = null;
+        int packetIndexInQueue = -1;
 
-        Connection connToSendOn = findAnyAvailableConnectionFromSystem(this, gameState);
 
-        if (connToSendOn != null) {
-            storedPackets.remove(0);
+        for (int i = 0; i < storedPackets.size(); i++) {
+            Packet candidatePacket = storedPackets.get(i);
+            if (candidatePacket == null) continue;
+
+
+            Connection availableConnection = findAnyFreeOutputConnection(this, gameState);
+            if (availableConnection != null) {
+                packetToSend = candidatePacket;
+                connToSendOn = availableConnection;
+                packetIndexInQueue = i;
+                break;
+            }
+        }
+
+        if (packetToSend != null && connToSendOn != null && packetIndexInQueue != -1) {
+            storedPackets.remove(packetIndexInQueue);
+
             packetToSend.startMoving(connToSendOn);
             gameState.addPacket(packetToSend);
-            System.out.println("System " + (this.hashCode() % 1000) + " sent packet: " + packetToSend.getType() +
-                    " via its port type: " + connToSendOn.getStartPort().getPacketType());
-            updateIndicatorState();
+
+            System.out.println("SystemNode " + (this.hashCode() % 1000) + " (Role: " + this.role +
+                    ") sent packet: " + packetToSend.getType() + " (from index " + packetIndexInQueue + ")" +
+                    " via output port of type: " + connToSendOn.getStartPort().getPacketType() +
+                    ". Packet Stability on exit: " + String.format("%.2f", packetToSend.getStabilityOnWire()));
+        } else if (!storedPackets.isEmpty()){
+
         }
     }
 
@@ -165,23 +221,29 @@ public class SystemNode {
         return null;
     }
 
+    private Connection findAnyFreeOutputConnection(SystemNode system, GameState state) {
+        if (system == null || state == null) return null;
+        List<Connection> freeConnections = new ArrayList<>();
 
-    private Connection findAvailableConnectionFromSystem(SystemNode system, GameState state, PacketType packetTypeToMatch) {
-        List<Connection> suitableConnections = new ArrayList<>();
         for (Port port : system.getOutputPorts()) {
-            if (port.getPacketType() == packetTypeToMatch) {
-                Connection conn = findConnectionFromPort(port, state);
-                if (conn != null && !isConnectionOccupied(conn, state)) {
-                    suitableConnections.add(conn);
+            if (port.isConnected()) {
+                Connection conn = port.getConnectedConnection();
+                if (conn != null) {
+                    boolean occupied = isConnectionOccupied(conn, state);
+                    if (!occupied) {
+                        freeConnections.add(conn);
+                    }
+                } else {
                 }
             }
         }
-        if (!suitableConnections.isEmpty()) {
-            return suitableConnections.get(random.nextInt(suitableConnections.size()));
+
+        if (!freeConnections.isEmpty()) {
+            Connection chosen = freeConnections.get(random.nextInt(freeConnections.size()));
+            return chosen;
         }
         return null;
     }
-
 
     private Connection findConnectionFromPort(Port port, GameState gameState) {
         if (port == null || gameState == null) return null;
@@ -193,10 +255,11 @@ public class SystemNode {
         return null;
     }
 
-    private boolean isConnectionOccupied(Connection connection, GameState gameState) {
-        if (connection == null || gameState == null) return true;
+    private boolean isConnectionOccupied(Connection connectionToCheck, GameState gameState) {
+
+        if (connectionToCheck == null || gameState == null) return true;
         for (Packet packet : gameState.getPackets()) {
-            if (packet.getCurrentConnection() == connection && packet.getProgressOnConnection() > 0.0001) {
+            if (packet.getCurrentConnection() == connectionToCheck && packet.getProgressOnConnection() > 0.01 ) {
                 return true;
             }
         }
@@ -205,6 +268,20 @@ public class SystemNode {
 
     private void updateIndicatorState() {
         this.indicatorOn = !storedPackets.isEmpty();
+    }
+
+    public boolean areAllNodePortsConnected() {
+        for (Port port : inputPorts) {
+            if (!port.isConnected()) {
+                return false;
+            }
+        }
+        for (Port port : outputPorts) {
+            if (!port.isConnected()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public double getX() { return x; }

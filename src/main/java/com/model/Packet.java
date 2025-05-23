@@ -1,261 +1,329 @@
 package com.model;
 
 import com.blueprinthell.Config;
-import javafx.geometry.Point2D;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
-import javafx.scene.paint.Color;
-import javafx.scene.text.Font;
-import javafx.scene.text.FontWeight;
+import javafx.geometry.Point2D;
+import java.util.UUID;
+import java.util.HashMap;
+import java.util.Map;
+
 
 public class Packet {
 
     private final PacketType type;
     private double x;
     private double y;
-    private Vector2D velocity = new Vector2D();
-    private double acceleration = 0.0;
-    private Connection currentConnection = null;
-    private Port targetPort = null;
-    private Port startPort = null;
-    private double progressOnConnection = 0.0;
-    private transient Node visualNode = null;
+    private Vector2D velocity;
+    private double acceleration;
+    private Connection currentConnection;
+    private Port targetPort;
+    private Port startPort;
+    private double progressOnConnection;
+    private transient Node visualNode;
     private final int initialSize;
     private int currentSize;
-    private transient Label sizeLabel = null;
-    private double noiseLevel = 0.0;
-    private double stabilityOnWire = 1.0;
-    private boolean isOffWire = false;
+    private transient Label sizeLabel;
+    private double noiseLevel;
+    private double stabilityOnWire;
+    private boolean isOffWire;
+    private final String id;
+    private Map<String, Double> collisionCooldownWithPackets;
+    private double currentMaxSpeedOnWire;
+    private double inheritedStabilityDamage = 0.0;
+    private double timeSpentIdleOffWireSeconds = 0.0;
 
     public Packet(PacketType type, double initialX, double initialY) {
+        this.id = UUID.randomUUID().toString();
+        this.collisionCooldownWithPackets = new HashMap<>();
         this.type = type;
         this.x = initialX;
         this.y = initialY;
-
+        this.velocity = new Vector2D();
         if (type == PacketType.SQUARE) {
-            this.initialSize = 2;
+            this.initialSize = Config.PACKET_SQUARE_INITIAL_SIZE;
         } else {
-            this.initialSize = 3;
+            this.initialSize = Config.PACKET_TRIANGLE_INITIAL_SIZE;
         }
         this.currentSize = this.initialSize;
-
         this.sizeLabel = new Label(String.valueOf(this.currentSize));
-        this.sizeLabel.setFont(Font.font("Arial", FontWeight.BOLD, 9));
-        this.sizeLabel.setTextFill(Color.WHITE);
+        this.sizeLabel.setFont(javafx.scene.text.Font.font("Arial", javafx.scene.text.FontWeight.BOLD, 9));
+        this.sizeLabel.setTextFill(javafx.scene.paint.Color.WHITE);
         this.sizeLabel.setMouseTransparent(true);
+        this.currentMaxSpeedOnWire = Config.BASE_PACKET_SPEED;
+        this.stabilityOnWire = 1.0;
+        this.isOffWire = false;
+        this.timeSpentIdleOffWireSeconds = 0.0;
+        this.inheritedStabilityDamage = 0.0;
+        this.noiseLevel = 0.0;
+        this.acceleration = 0.0;
+        this.progressOnConnection = 0.0;
+    }
 
+    public void setInheritedStabilityDamage(double damage) {
+        this.inheritedStabilityDamage = Math.max(0, Math.min(1.0, damage));
+    }
+
+    public double getInheritedStabilityDamage() {
+        return this.inheritedStabilityDamage;
+    }
+
+    public void startMoving(Connection connection) {
+        if (connection == null || connection.getStartPort() == null || connection.getEndPort() == null) {
+            this.isOffWire = true;
+            this.velocity.set(Config.INITIAL_OFF_WIRE_VELOCITY_X, Config.INITIAL_OFF_WIRE_VELOCITY_Y);
+            return;
+        }
+        this.currentConnection = connection;
+        this.startPort = connection.getStartPort();
+        this.targetPort = connection.getEndPort();
+        this.progressOnConnection = 0.0;
+        this.acceleration = 0.0;
+        this.isOffWire = false;
+        this.timeSpentIdleOffWireSeconds = 0.0;
+        this.stabilityOnWire = 1.0 - this.inheritedStabilityDamage;
+        this.inheritedStabilityDamage = 0.0;
+
+        this.setX(startPort.getAbsoluteX());
+        this.setY(startPort.getAbsoluteY());
+
+        boolean compatibleStart = (this.type == startPort.getPacketType());
+        double initialSpeedFactorToUse = 1.0;
+
+        if (this.type == PacketType.SQUARE) {
+            this.currentMaxSpeedOnWire = Config.BASE_PACKET_SPEED * (compatibleStart ? Config.SQUARE_COMPATIBLE_SPEED_FACTOR : Config.SQUARE_INCOMPATIBLE_SPEED_FACTOR);
+            initialSpeedFactorToUse = Config.SQUARE_INITIAL_SPEED_FACTOR;
+        } else {
+            if (compatibleStart) {
+                this.currentMaxSpeedOnWire = Config.BASE_PACKET_SPEED * Config.TRIANGLE_COMPATIBLE_SPEED_FACTOR;
+                this.acceleration = 0;
+                initialSpeedFactorToUse = Config.TRIANGLE_COMPATIBLE_INITIAL_SPEED_FACTOR;
+            } else {
+                this.currentMaxSpeedOnWire = Config.BASE_PACKET_SPEED * Config.TRIANGLE_INCOMPATIBLE_MAX_SPEED_FACTOR;
+                this.acceleration = Config.TRIANGLE_PACKET_ACCELERATION;
+                initialSpeedFactorToUse = Config.TRIANGLE_INCOMPATIBLE_INITIAL_SPEED_FACTOR;
+            }
+        }
+
+        if (this.stabilityOnWire < Config.STABILITY_THRESHOLD_FOR_SPEED_REDUCTION) {
+            initialSpeedFactorToUse *= (Config.INTERMEDIATE_EXIT_SPEED_FACTOR_DAMAGED + this.stabilityOnWire);
+            initialSpeedFactorToUse = Math.max(Config.MIN_INITIAL_SPEED_FACTOR, initialSpeedFactorToUse);
+        }
+
+        Vector2D direction = Vector2D.direction(
+                new Vector2D(startPort.getAbsoluteX(), startPort.getAbsoluteY()),
+                new Vector2D(targetPort.getAbsoluteX(), targetPort.getAbsoluteY())
+        );
+        if (direction.magnitudeSquared() < 0.0001) {
+            direction = new Vector2D(1, 0);
+        }
+        this.velocity.set(Vector2D.multiply(direction, this.currentMaxSpeedOnWire * initialSpeedFactorToUse));
+
+        if (this.sizeLabel != null) {
+            updateLabelPosition();
+        }
     }
 
     public boolean update(double deltaTime) {
         if (deltaTime <= 0) return false;
 
         if (isOffWire) {
-            this.setX(this.x + velocity.getX() * deltaTime);
-            this.setY(this.y + velocity.getY() * deltaTime);
+            this.x += velocity.getX() * deltaTime;
+            this.y += velocity.getY() * deltaTime;
             velocity.multiply(Config.OFF_WIRE_FRICTION);
-            if (velocity.magnitudeSquared() < 0.5) {
+            if (velocity.magnitudeSquared() < Config.MIN_VELOCITY_SQUARED_TO_STOP_OFF_WIRE) {
                 velocity.set(0, 0);
+                timeSpentIdleOffWireSeconds += deltaTime;
+            } else {
+                timeSpentIdleOffWireSeconds = 0.0;
             }
+            updateLabelPosition();
             return false;
         }
 
         if (currentConnection == null || targetPort == null || startPort == null) {
-            if (velocity.magnitudeSquared() > 0.01) {
-                isOffWire = true;
-                System.out.println("Packet " + type + " became off-wire (no connection but moving).");
-            }
+            isOffWire = true;
+            timeSpentIdleOffWireSeconds = 0.0;
             return false;
         }
 
-        if (acceleration > 0 && stabilityOnWire > 0.1) {
-            if (velocity.magnitudeSquared() < (Config.BASE_PACKET_SPEED * Config.BASE_PACKET_SPEED * 1.1)) {
-                Vector2D direction = Vector2D.direction(new Vector2D(startPort.getAbsoluteX(), startPort.getAbsoluteY()), new Vector2D(targetPort.getAbsoluteX(), targetPort.getAbsoluteY()));
-                velocity.add(Vector2D.multiply(direction, acceleration * deltaTime));
-            } else {
-                Vector2D direction = Vector2D.normalized(velocity);
-                velocity.set(Vector2D.multiply(direction, Config.BASE_PACKET_SPEED));
-                acceleration = 0;
+        if (this.type == PacketType.TRIANGLE && this.acceleration > 0 && stabilityOnWire > Config.MIN_STABILITY_FOR_ACCELERATION) {
+            if (velocity.magnitude() < this.currentMaxSpeedOnWire) {
+                Vector2D directionToTarget = Vector2D.direction(new Vector2D(x, y), new Vector2D(targetPort.getAbsoluteX(), targetPort.getAbsoluteY())).normalize();
+                if (directionToTarget.magnitudeSquared() < 0.0001 && velocity.magnitudeSquared() > 0.0001) directionToTarget = Vector2D.normalized(velocity);
+                if (directionToTarget.magnitudeSquared() < 0.0001) directionToTarget = new Vector2D(1,0);
+
+                Vector2D accelerationVector = Vector2D.multiply(directionToTarget, this.acceleration * deltaTime);
+                if (Vector2D.add(this.velocity, accelerationVector).magnitudeSquared() <= this.currentMaxSpeedOnWire * this.currentMaxSpeedOnWire) {
+                    this.velocity.add(accelerationVector);
+                } else {
+                    this.velocity.set(Vector2D.multiply(directionToTarget, this.currentMaxSpeedOnWire));
+                }
             }
         }
 
         Vector2D packetPosVec = new Vector2D(this.x, this.y);
         Point2D p1_javafx = new Point2D(startPort.getAbsoluteX(), startPort.getAbsoluteY());
         Point2D p2_javafx = new Point2D(targetPort.getAbsoluteX(), targetPort.getAbsoluteY());
-        double dx_segment = p1_javafx.getX() - p2_javafx.getX();
-        double dy_segment = p1_javafx.getY() - p2_javafx.getY();
-        double lineSegmentLengthSq = dx_segment * dx_segment + dy_segment * dy_segment;
+        double distanceFromWire;
+        double segmentDx = p2_javafx.getX() - p1_javafx.getX();
+        double segmentDy = p2_javafx.getY() - p1_javafx.getY();
+        double lineSegmentLengthSq = segmentDx * segmentDx + segmentDy * segmentDy;
         Vector2D closestPointOnWireSegment;
 
         if (lineSegmentLengthSq < 0.0001) {
             closestPointOnWireSegment = new Vector2D(p1_javafx.getX(), p1_javafx.getY());
         } else {
-            double t = ((packetPosVec.getX() - p1_javafx.getX()) * (p2_javafx.getX() - p1_javafx.getX()) + (packetPosVec.getY() - p1_javafx.getY()) * (p2_javafx.getY() - p1_javafx.getY())) / lineSegmentLengthSq;
+            double t = ((packetPosVec.getX() - p1_javafx.getX()) * segmentDx + (packetPosVec.getY() - p1_javafx.getY()) * segmentDy) / lineSegmentLengthSq;
             t = Math.max(0, Math.min(1, t));
-            closestPointOnWireSegment = new Vector2D(p1_javafx.getX() + t * (p2_javafx.getX() - p1_javafx.getX()), p1_javafx.getY() + t * (p2_javafx.getY() - p1_javafx.getY()));
+            closestPointOnWireSegment = new Vector2D(p1_javafx.getX() + t * segmentDx, p1_javafx.getY() + t * segmentDy);
         }
-        double distanceFromWire = packetPosVec.distance(closestPointOnWireSegment);
+        distanceFromWire = packetPosVec.distance(closestPointOnWireSegment);
 
-        if (distanceFromWire > 0.1 && stabilityOnWire > 0.01) {
+        if (distanceFromWire > Config.MIN_DEVIATION_FOR_RETURN_FORCE && stabilityOnWire > Config.MIN_STABILITY_FOR_RETURN_FORCE) {
             Vector2D forceToWireDir = Vector2D.subtract(closestPointOnWireSegment, packetPosVec).normalize();
-            double returnForceMag = distanceFromWire * stabilityOnWire * Config.WIRE_RETURN_FORCE_STRENGTH;
-            velocity.add(Vector2D.multiply(forceToWireDir, returnForceMag * deltaTime));
-        }
-
-        this.setX(this.x + velocity.getX() * deltaTime);
-        this.setY(this.y + velocity.getY() * deltaTime);
-
-        Vector2D wireDirection = Vector2D.direction(new Vector2D(startPort.getAbsoluteX(), startPort.getAbsoluteY()), new Vector2D(targetPort.getAbsoluteX(), targetPort.getAbsoluteY()));
-        double speedAlongWire = velocity.getX() * wireDirection.getX() + velocity.getY() * wireDirection.getY();
-        double distanceMovedAlongWire = speedAlongWire * deltaTime;
-        double totalWireLength = currentConnection.getLength();
-
-        if (totalWireLength < 0.01) {
-            if(!isOffWire) {
-                this.setX(targetPort.getAbsoluteX()); this.setY(targetPort.getAbsoluteY());
-                this.velocity.set(0,0); this.acceleration = 0;
-                return true;
+            if (forceToWireDir.magnitudeSquared() > 0.0001) {
+                double returnForceMag = Math.min(distanceFromWire * Config.WIRE_RETURN_FORCE_STRENGTH, Config.MAX_WIRE_RETURN_FORCE);
+                this.velocity.add(Vector2D.multiply(forceToWireDir, returnForceMag * stabilityOnWire * deltaTime));
             }
-            return false;
         }
 
-        progressOnConnection += distanceMovedAlongWire / totalWireLength;
+        this.x += velocity.getX() * deltaTime;
+        this.y += velocity.getY() * deltaTime;
+        updateLabelPosition();
 
-        if (!isOffWire && (stabilityOnWire <= 0.01 || distanceFromWire > Config.COLLISION_DEVIATION_THRESHOLD)) {
-            isOffWire = true;
-            System.out.println("Packet " + type + " became off-wire. Stability: " + String.format("%.2f", stabilityOnWire) + ", Deviation: " + String.format("%.2f", distanceFromWire));
-        }
-        progressOnConnection = Math.max(0, Math.min(1.0, progressOnConnection));
 
-        if (progressOnConnection >= 0.99 && !isOffWire) {
+        double totalWireLength = currentConnection.getLength();
+        Vector2D currentPosVec = new Vector2D(this.x, this.y);
+        Vector2D targetPosVec = new Vector2D(targetPort.getAbsoluteX(), targetPort.getAbsoluteY());
+
+        if (totalWireLength < Config.MIN_WIRE_LENGTH_FOR_PROGRESS_CALC || currentPosVec.distance(targetPosVec) < Config.ARRIVAL_DISTANCE_THRESHOLD) {
             this.setX(targetPort.getAbsoluteX());
             this.setY(targetPort.getAbsoluteY());
             this.velocity.set(0, 0);
             this.acceleration = 0;
             return true;
         }
+
+        Vector2D wireDir = Vector2D.direction(new Vector2D(startPort.getAbsoluteX(), startPort.getAbsoluteY()), targetPosVec);
+        if(wireDir.magnitudeSquared() < 0.0001) wireDir = new Vector2D(1,0);
+        double speedAlong = velocity.dot(wireDir);
+        if (speedAlong > 0) {
+            progressOnConnection += (speedAlong * deltaTime) / totalWireLength;
+        }
+        progressOnConnection = Math.max(0, Math.min(1.0, progressOnConnection));
+
+        if (stabilityOnWire < Config.MIN_STABILITY_TO_STAY_ON_WIRE || distanceFromWire > Config.DEVIATION_THRESHOLD_FOR_OFF_WIRE) {
+            isOffWire = true;
+            timeSpentIdleOffWireSeconds = 0.0;
+        }
+
+        if (progressOnConnection >= Config.ARRIVAL_PROGRESS_THRESHOLD) {
+            this.setX(targetPort.getAbsoluteX());
+            this.setY(targetPort.getAbsoluteY());
+            this.velocity.set(0, 0);
+            this.acceleration = 0;
+            return true;
+        }
+
         return false;
     }
 
-    public void startMoving(Connection connection) {
-        if (connection == null) return;
-        this.currentConnection = connection;
-        this.startPort = connection.getStartPort();
-        this.targetPort = connection.getEndPort();
-        this.progressOnConnection = 0.0;
-        this.acceleration = 0.0;
-
-        this.setX(startPort.getAbsoluteX());
-        this.setY(startPort.getAbsoluteY());
-
-        boolean compatibleStart = (this.type == startPort.getPacketType());
-        double initialSpeed;
-        Vector2D direction = Vector2D.direction(
-                new Vector2D(startPort.getAbsoluteX(), startPort.getAbsoluteY()),
-                new Vector2D(targetPort.getAbsoluteX(), targetPort.getAbsoluteY())
-        );
-
-        if (this.type == PacketType.SQUARE) {
-            initialSpeed = compatibleStart ? (Config.BASE_PACKET_SPEED * 0.5) : Config.BASE_PACKET_SPEED;
-        } else {
-            if (compatibleStart) {
-                initialSpeed = Config.BASE_PACKET_SPEED;
-            } else {
-                initialSpeed = 1.0;
-                this.acceleration = Config.TRIANGLE_PACKET_ACCELERATION;
-            }
-        }
-        this.velocity.set(direction.multiply(initialSpeed));
-        updateLabelPosition();
-        this.isOffWire = false;
-        this.stabilityOnWire = 1.0;
+    private String getPacketIdSafe() {
+        if (this.id == null || this.id.isEmpty()) return "[NO_ID]";
+        return (this.id.length() < 4) ? this.id : this.id.substring(0,4);
     }
 
     public void applyImpactForce(Vector2D force) {
         if (this.velocity == null) this.velocity = new Vector2D();
-        this.velocity.add(Vector2D.multiply(force, 0.3));
+        if (force == null || force.magnitudeSquared() < 0.0001) return;
 
-        double maxSpeedAfterImpact = Config.BASE_PACKET_SPEED * 1.2;
-        if (this.velocity.magnitudeSquared() > maxSpeedAfterImpact * maxSpeedAfterImpact) {
-            this.velocity.normalize().multiply(maxSpeedAfterImpact);
+        Vector2D effectiveForce = Vector2D.multiply(force.normalize(), force.magnitude() * Config.IMPACT_FORCE_EFFECTIVENESS_ON_VELOCITY);
+
+        Vector2D currentVelocityComponent = Vector2D.multiply(this.velocity, Config.PACKET_INERTIA_FACTOR);
+        Vector2D newForceComponent = Vector2D.multiply(effectiveForce, 1.0 - Config.PACKET_INERTIA_FACTOR);
+        this.velocity.set(Vector2D.add(currentVelocityComponent, newForceComponent));
+
+        double absMaxSpeedSq = Config.ABSOLUTE_MAX_SPEED_AFTER_IMPACT * Config.ABSOLUTE_MAX_SPEED_AFTER_IMPACT;
+        if (this.velocity.magnitudeSquared() > absMaxSpeedSq) {
+            this.velocity.normalize().multiply(Config.ABSOLUTE_MAX_SPEED_AFTER_IMPACT);
         }
-
-        this.stabilityOnWire = Math.max(0, this.stabilityOnWire - Config.PACKET_STABILITY_REDUCTION_FACTOR);
-        if (this.stabilityOnWire <= 0.01 && !isOffWire) {
-            System.out.println("Packet stability depleted by impact. Now off-wire.");
+        if (!isOffWire) {
+            this.stabilityOnWire = Math.max(0, this.stabilityOnWire - Config.PACKET_STABILITY_REDUCTION_FACTOR_FROM_IMPACT);
         }
-        this.acceleration = 0;
-    }
-
-    public void updateLabelPosition() {
-        if (this.sizeLabel != null) {
-            double visualPacketWidth, visualPacketHeight;
-            if (type == PacketType.SQUARE) {
-                visualPacketWidth = Config.PORT_VISUAL_SIZE_SQUARE * 2;
-                visualPacketHeight = Config.PORT_VISUAL_SIZE_SQUARE * 2;
-            } else {
-                visualPacketWidth = Config.PORT_VISUAL_SIZE_TRIANGLE * 1.8;
-                visualPacketHeight = Config.PORT_VISUAL_SIZE_TRIANGLE * 1.8 * (Math.sqrt(3)/2.0) / (2.0/3.0);
-            }
-
-            double labelWidth = this.sizeLabel.prefWidth(-1);
-            double labelOffsetX = -labelWidth / 2.0;
-            double labelOffsetY = -visualPacketHeight / 1.5 - this.sizeLabel.prefHeight(-1)/2;
-
-            this.sizeLabel.setLayoutX(this.x + labelOffsetX);
-            this.sizeLabel.setLayoutY(this.y + labelOffsetY);
-        }
-    }
-
-    public void decreaseSize(int amount) {
-        if (amount > 0) {
-            this.currentSize = Math.max(0, this.currentSize - amount);
-            if (this.sizeLabel != null) {
-                this.sizeLabel.setText(String.valueOf(this.currentSize));
-            }
-        }
-    }
-
-    public void addNoise(double receivedNoise) {
-        if (receivedNoise > 0) {
-            this.noiseLevel = Math.min(1.0, this.noiseLevel + receivedNoise);
-            if(this.stabilityOnWire <= 0.01 && !isOffWire) isOffWire = true;
-            System.out.println("Packet at (...) noise added to: " + String.format("%.2f", this.noiseLevel));
-        }
-    }
-
-    public void setNoiseLevel(double level) {
-        this.noiseLevel = Math.max(0, Math.min(1.0, level));
-        System.out.println("Packet noise set to: " + String.format("%.2f", this.noiseLevel));
     }
 
     public PacketType getType() { return type; }
     public double getX() { return x; }
+    public void setX(double x) { this.x = x; if(sizeLabel!=null) updateLabelPosition(); }
     public double getY() { return y; }
+    public void setY(double y) { this.y = y; if(sizeLabel!=null) updateLabelPosition(); }
     public Vector2D getVelocity() { return velocity; }
+    public void setVelocity(Vector2D velocity) { this.velocity.set(velocity); }
     public double getAcceleration() { return acceleration; }
+    public double getTimeSpentIdleOffWireSeconds() {
+        return timeSpentIdleOffWireSeconds;
+    }
+    public void setAcceleration(double acceleration) { this.acceleration = acceleration; }
     public Connection getCurrentConnection() { return currentConnection; }
+    public void setCurrentConnection(Connection connection) { this.currentConnection = connection; }
     public Port getTargetPort() { return targetPort; }
+    public void setTargetPort(Port port) { this.targetPort = port; }
     public Port getStartPort() { return startPort; }
+    public void setStartPort(Port port) { this.startPort = port; }
     public double getProgressOnConnection() { return progressOnConnection; }
+    public void setProgressOnConnection(double progress) { this.progressOnConnection = progress; }
     public Node getVisualNode() { return visualNode; }
+    public void setVisualNode(Node node) { this.visualNode = node; }
     public int getInitialSize() { return initialSize; }
     public int getCurrentSize() { return currentSize; }
+    public void setCurrentSize(int size) { this.currentSize = Math.max(0,size); if(sizeLabel!=null) this.sizeLabel.setText(String.valueOf(this.currentSize));}
     public Label getSizeLabel() { return sizeLabel; }
     public double getNoiseLevel() { return noiseLevel; }
+    public void setNoiseLevel(double noise) { this.noiseLevel = Math.max(0, Math.min(1.0,noise));}
+    public double getStabilityOnWire() { return stabilityOnWire; }
+    public void setStabilityOnWire(double stability) { this.stabilityOnWire = Math.max(0,Math.min(1.0,stability));}
     public boolean isOffWire() { return isOffWire; }
-
-
-    public void setX(double x) { this.x = x; updateLabelPosition(); }
-    public void setY(double y) { this.y = y; updateLabelPosition(); }
-    public void setVelocity(Vector2D velocity) { this.velocity.set(velocity); }
-    public void setAcceleration(double acceleration) { this.acceleration = acceleration; }
-    public void setCurrentConnection(Connection currentConnection) { this.currentConnection = currentConnection; }
-    public void setTargetPort(Port targetPort) { this.targetPort = targetPort; }
-    public void setStartPort(Port startPort) { this.startPort = startPort; }
-    public void setProgressOnConnection(double progressOnConnection) { this.progressOnConnection = progressOnConnection; }
-    public void setVisualNode(Node visualNode) { this.visualNode = visualNode; }
-    public void setCurrentSize(int currentSize) {
-        this.currentSize = Math.max(0, currentSize);
-        if(this.sizeLabel != null) this.sizeLabel.setText(String.valueOf(this.currentSize));
+    public String getId() { return id; }
+    public boolean isOnCollisionCooldownWith(Packet otherPacket) {
+        if (otherPacket == null || !this.collisionCooldownWithPackets.containsKey(otherPacket.getId())) return false;
+        double cooldownEndTime = this.collisionCooldownWithPackets.get(otherPacket.getId());
+        boolean stillOnCooldown = (System.nanoTime() / 1_000_000_000.0) < cooldownEndTime;
+        if (!stillOnCooldown) this.collisionCooldownWithPackets.remove(otherPacket.getId());
+        return stillOnCooldown;
     }
+    public void registerCollisionWith(Packet otherPacket) {
+        if (otherPacket == null) return;
+        double cooldownEndTime = System.nanoTime() / 1_000_000_000.0 + Config.PACKET_COLLISION_COOLDOWN_SECONDS;
+        this.collisionCooldownWithPackets.put(otherPacket.getId(), cooldownEndTime);
+        otherPacket.collisionCooldownWithPackets.put(this.id, cooldownEndTime);
+    }
+    public void decreaseSize(int amount) {
+        if (amount <= 0 || this.currentSize <= 0) return;
+        this.currentSize = Math.max(0, this.currentSize - amount);
+        if (this.sizeLabel != null) this.sizeLabel.setText(String.valueOf(this.currentSize));
+    }
+    public void addNoise(double receivedNoise) {
+        if (receivedNoise <= 0) {
+            return;
+        }
+
+        double previousNoiseLevel = this.noiseLevel;
+        this.noiseLevel = Math.max(0.0, Math.min(1.0, this.noiseLevel + receivedNoise));
+
+        if (this.noiseLevel > previousNoiseLevel || receivedNoise > 0) {
+            System.out.println("Packet " + getPacketIdSafe() + " (Type: " + this.type +
+                    ") received noise: +" + String.format("%.3f", receivedNoise) +
+                    ". New noise level: " + String.format("%.3f", this.noiseLevel));
+        }
+    }
+
+    public void updateLabelPosition() {
+        if (this.sizeLabel == null || this.visualNode == null) return;
+        double labelOffsetX = -this.sizeLabel.prefWidth(-1) / 2.0;
+        double labelOffsetY = -15;
+        this.sizeLabel.setLayoutX(this.x + labelOffsetX);
+        this.sizeLabel.setLayoutY(this.y + labelOffsetY);
+    }
+
 }

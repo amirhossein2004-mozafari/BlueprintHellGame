@@ -36,104 +36,160 @@ public class MainApplication extends Application {
     private ShopController shopControllerInstance = null;
     private int currentLevelNumber = 0;
     private SettingsController settingsControllerInstance;
+    private int currentLevelNumberPlayed = 0;
+    private GameState completedGameStateForGameOver;
 
     @Override
     public void start(Stage stage) {
-        this.settingsControllerInstance = new SettingsController();
         this.primaryStage = stage;
         primaryStage.setTitle("Blueprint Hell");
         primaryStage.setResizable(false);
+        this.settingsControllerInstance = new SettingsController();
+
         AudioManager.loadSounds();
         AudioManager.playMenuBackgroundMusic(true);
+
         MenuController menuController = new MenuController(this);
         showMainMenu(menuController);
         primaryStage.show();
     }
 
-    private void stopCurrentGameLoop() {
+    public GameState getGameStateForGameOver() {
+        return completedGameStateForGameOver;
+    }
+
+    public boolean hasNextLevel(int nextLevelNumber) {
+        String fileName = "/levels/level" + nextLevelNumber + ".json";
+        try (java.io.InputStream inputStream = LevelLoader.class.getResourceAsStream(fileName)) {
+            return inputStream != null;
+        } catch (Exception e) {
+            System.err.println("Error checking for next level file: " + fileName + " - " + e.getMessage());
+            return false;
+        }
+    }
+
+    public void stopCurrentGameLoop() {
+        System.out.println("MainApplication.stopCurrentGameLoop: Initiating cleanup of active game components...");
+
         if (gameLoop != null) {
             gameLoop.stop();
             gameLoop = null;
-            System.out.println("GameLoop stopped and nulled.");
+            System.out.println("MainApplication.stopCurrentGameLoop: GameLoop stopped and nulled.");
         }
+
         if (gameController != null) {
             gameController = null;
-            System.out.println("GameController nulled.");
+            System.out.println("MainApplication.stopCurrentGameLoop: GameController nulled.");
         }
-        gameState = null;
-        System.out.println("GameState nulled.");
 
-        hudView = null;
-        System.out.println("HudView nulled.");
+        if (hudView != null) {
+            hudView = null;
+            System.out.println("MainApplication.stopCurrentGameLoop: HudView reference nulled.");
+        }
 
-        shopControllerInstance = null;
-        System.out.println("ShopController instance nulled.");
+        if (shopControllerInstance != null) {
+            shopControllerInstance = null;
+            System.out.println("MainApplication.stopCurrentGameLoop: ShopController instance nulled.");
+        }
 
-        if (primaryStage != null && primaryStage.getScene() != null && primaryStage.getScene().getRoot() instanceof BorderPane) {
+        if (primaryStage != null && primaryStage.getScene() != null &&
+                primaryStage.getScene().getRoot() instanceof BorderPane) {
             BorderPane rootNode = (BorderPane) primaryStage.getScene().getRoot();
             if (shopViewInstance != null && rootNode.getRight() == shopViewInstance) {
                 rootNode.setRight(null);
-                System.out.println("ShopView removed from rootNode's right.");
+                System.out.println("MainApplication.stopCurrentGameLoop: ShopView removed from BorderPane's right.");
             }
         }
-        shopViewInstance = null;
-        System.out.println("ShopView instance nulled.");
-        System.out.println("stopCurrentGameLoop: All relevant game instances (loop, controllers, views, state) nulled or cleaned up.");
+        if (shopViewInstance != null) {
+            shopViewInstance.setVisible(false);
+            shopViewInstance = null;
+            System.out.println("MainApplication.stopCurrentGameLoop: ShopView instance nulled and set invisible.");
+        }
+        System.out.println("MainApplication.stopCurrentGameLoop: Cleanup of game components (excluding gameState itself) complete.");
     }
 
     public void showMainMenu(MenuController controller) {
+        System.out.println("MainApplication.showMainMenu: Attempting to show Main Menu...");
+
         stopCurrentGameLoop();
-        System.out.println("Attempting to show Main Menu...");
+        AudioManager.stopBackgroundMusic();
+
+        this.gameState = null;
+        this.completedGameStateForGameOver = null;
+        System.out.println("MainApplication.showMainMenu: Previous game states nulled.");
+
         if (controller == null) {
-            System.err.println("MainApp Error: MenuController is null for showMainMenu.");
-            return;
+            System.err.println("MainApplication.showMainMenu Error: MenuController is null. Creating a default one.");
+            controller = new MenuController(this);
         }
+
+        AudioManager.playMenuBackgroundMusic(true);
+        System.out.println("MainApplication.showMainMenu: Menu background music started.");
+
         MenuView menuView = new MenuView(controller);
         Scene menuScene = new Scene(menuView, Config.WINDOW_WIDTH, Config.WINDOW_HEIGHT);
+
         applyStylesheet(menuScene, "/styles/style.css");
-        primaryStage.setScene(menuScene);
-        System.out.println("Main Menu shown.");
-        AudioManager.playMenuBackgroundMusic(true);
+
+        if (primaryStage != null) {
+            primaryStage.setScene(menuScene);
+            System.out.println("MainApplication.showMainMenu: Main Menu scene set on primaryStage.");
+        } else {
+            System.err.println("MainApplication.showMainMenu Error: primaryStage is null. Cannot set scene.");
+        }
+    }
+
+    @Override
+    public void stop() throws Exception {
+        System.out.println("MainApplication.stop(): Application is stopping...");
+        AudioManager.stopBackgroundMusic();
+        System.out.println("MainApplication.stop(): All background music explicitly stopped.");
+        super.stop();
     }
 
     public void startGame(int levelNumber) {
-        System.out.println("startGame: Called for level " + levelNumber);
+        this.currentLevelNumberPlayed = levelNumber;
+        this.completedGameStateForGameOver = null;
+
         stopCurrentGameLoop();
-        this.currentLevelNumber = levelNumber;
+        this.gameState = null;
+
         this.gameState = LevelLoader.loadLevel(levelNumber);
+
         if (this.gameState == null) {
-            System.err.println("Failed to load level " + levelNumber + ". Returning to main menu.");
+            System.err.println("MainApplication.startGame: CRITICAL - Failed to load level " + levelNumber + ". GameState is null. Returning to main menu.");
             showMainMenu(new MenuController(this));
             return;
         }
-        System.out.println("startGame: GameState for level " + levelNumber + " loaded. isGameRunning should be false: " + gameState.isGameRunning());
-        System.out.println("startGame: Initial wire length from loaded level (or default): " + gameState.getRemainingWireLength());
-
+        System.out.println("MainApplication.startGame: GameState for level " + levelNumber + " loaded. isGameRunning: " + this.gameState.isGameRunning());
 
         double gameViewHeight = Config.WINDOW_HEIGHT - Config.HUD_HEIGHT;
-
         if (gameViewHeight <= 0) {
+            System.err.println("MainApplication.startGame: Warning - gameViewHeight is invalid. Using full window height.");
             gameViewHeight = Config.WINDOW_HEIGHT;
         }
         this.gameView = new GameView(Config.WINDOW_WIDTH, gameViewHeight);
-        this.hudView = new HudView(gameState);
-
+        this.hudView = new HudView(this.gameState);
 
         BorderPane rootNode = new BorderPane();
-        rootNode.setStyle("-fx-background-color: " + Config.COLOR_BACKGROUND.toString().substring(2) + ";");        rootNode.setTop(this.hudView);
+        rootNode.setStyle("-fx-background-color: " + Config.COLOR_BACKGROUND.toString().substring(2) + ";");
         rootNode.setTop(this.hudView);
         rootNode.setCenter(this.gameView);
-        this.gameController = new GameController(gameState, this.gameView, this);
+
+        this.gameController = new GameController(this.gameState, this.gameView, this);
         this.gameController.initializeGame();
-        this.shopControllerInstance = new ShopController(this, gameState, this.gameController);
+
+        this.shopControllerInstance = new ShopController(this, this.gameState, this.gameController);
+        AudioManager.playGameBackgroundMusic(true);
         Scene gameScene = new Scene(rootNode, Config.WINDOW_WIDTH, Config.WINDOW_HEIGHT);
         setupInputHandlers(gameScene, this.gameController, this.hudView);
         applyStylesheet(gameScene, "/styles/style.css");
-        this.gameLoop = new GameLoop(this.gameController, gameState);
+
+        this.gameLoop = new GameLoop(this.gameController, this.gameState);
         this.gameLoop.start();
+
         primaryStage.setScene(gameScene);
-        System.out.println("startGame: Game scene for level " + levelNumber + " set.");
-        AudioManager.playGameBackgroundMusic(true);
+        System.out.println("MainApplication.startGame: Game scene for level " + levelNumber + " is set. CurrentLevelPlayed: " + this.currentLevelNumberPlayed);
     }
 
 
@@ -235,11 +291,8 @@ public class MainApplication extends Application {
         try {
             String cssPath = java.util.Objects.requireNonNull(getClass().getResource(cssResourcePath)).toExternalForm();
             scene.getStylesheets().add(cssPath);
-            System.out.println("Stylesheet " + cssResourcePath + " applied successfully.");
-        } catch (NullPointerException e) {
-            e.printStackTrace();
         } catch (Exception e) {
-            e.printStackTrace();
+            System.err.println("Warning: Could not load stylesheet: " + cssResourcePath + " - " + e.getMessage());
         }
     }
 
@@ -349,15 +402,42 @@ public class MainApplication extends Application {
 
     public ShopView getShopViewInstance() { return shopViewInstance; }
 
-    public void showGameOver(boolean success, int score, int packetsLost) {
+    public void showGameOver(boolean success, int score, int packetsLostOrPercentage) {
+        System.out.println("MainApplication.showGameOver: Called. Success: " + success + ", Score: " + score +
+                ", Loss/Info: " + packetsLostOrPercentage + ", LevelPlayed: " + currentLevelNumberPlayed);
+
         AudioManager.stopBackgroundMusic();
+        System.out.println("MainApp.showGameOver: Background music stopped.");
+
         if (success) {
             AudioManager.playSoundEffect(AudioManager.SFX_LEVEL_COMPLETE);
+            System.out.println("MainApp.showGameOver: LEVEL_COMPLETE sound effect played.");
         } else {
             AudioManager.playSoundEffect(AudioManager.SFX_GAME_OVER);
+            System.out.println("MainApp.showGameOver: GAME_OVER sound effect played.");
         }
-    }
 
+        if (this.gameState != null) {
+            this.completedGameStateForGameOver = this.gameState;
+        } else if (this.completedGameStateForGameOver == null && currentLevelNumberPlayed > 0) {
+            System.err.println("MainApp.showGameOver WARNING: Current gameState is null, creating placeholder for GameOverView.");
+            this.completedGameStateForGameOver = new GameState(currentLevelNumberPlayed,0,0);
+        }
+
+        stopCurrentGameLoop();
+
+        this.gameState = null;
+        System.out.println("MainApp.showGameOver: Main gameState nulled.");
+
+
+        GameOverView gameOverView = new GameOverView(this, success, score, packetsLostOrPercentage, this.currentLevelNumberPlayed);
+        Scene gameOverScene = new Scene(gameOverView, Config.WINDOW_WIDTH, Config.WINDOW_HEIGHT);
+        applyStylesheet(gameOverScene, "/styles/style.css");
+
+        primaryStage.setScene(gameOverScene);
+        System.out.println("MainApp.showGameOver: Game Over/Win screen shown for level " + this.currentLevelNumberPlayed);
+
+    }
     public Stage getPrimaryStage() { return primaryStage; }
     public GameState getGameState() { return gameState; }
 

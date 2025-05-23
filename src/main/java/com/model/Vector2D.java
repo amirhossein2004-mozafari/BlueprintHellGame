@@ -11,6 +11,10 @@ public class Vector2D {
     public Vector2D() { this(0, 0); }
     public Vector2D(Vector2D other) { this(other.x, other.y); }
 
+    public double dot(Vector2D other) {
+        return this.x * other.x + this.y * other.y;
+    }
+
     public double getX() { return x; }
     public void setX(double x) { this.x = x; }
     public double getY() { return y; }

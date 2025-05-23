@@ -25,6 +25,7 @@ public class HudView extends HBox {
     private final Button startGameButton;
     private final Label timeElapsedLabel;
     private final Label currentLevelLabel;
+    private final Label spawnedPacketsLabel;
 
     private static final double METER_WIDTH = 130.0;
     private static final double METER_HEIGHT = 14.0;
@@ -97,6 +98,14 @@ public class HudView extends HBox {
                 }, gameState.gameTimeElapsedSecondsProperty())
         );
 
+        spawnedPacketsLabel = new Label();
+        spawnedPacketsLabel.setFont(Font.font("Arial", FontWeight.BOLD, 11));
+        spawnedPacketsLabel.setTextFill(Config.COLOR_HUD_TEXT);
+        spawnedPacketsLabel.textProperty().bind(
+                Bindings.format("پاکت خارج شده: %d / %d",
+                        gameState.totalPacketsSuccessfullySpawnedCountProperty(),
+                        gameState.packetsToSpawnInLevelProperty())
+        );
 
         wireLengthLabel = new Label();
         wireLengthLabel.setFont(Font.font("Arial", FontWeight.BOLD, 11));
@@ -119,24 +128,30 @@ public class HudView extends HBox {
         lossLabel.setFont(Font.font("Arial", FontWeight.BOLD, 11));
         lossLabel.setTextFill(Color.ORANGERED);
         lossLabel.textProperty().bind(
-                Bindings.format("لاس: %d/%d (%.0f%%)",
-                        gameState.packetLossProperty(),
-                        gameState.totalPacketsSpawnedProperty(),
-                        gameState.packetLossPercentageProperty()
+                Bindings.format("از دست رفته (اندازه): %.0f%% (کل %d/%d)",
+                        gameState.packetLossPercentageBySizeProperty(),
+                        gameState.totalSizeLostProperty(),
+                        gameState.totalInitialSizeOfSpawnedPacketsProperty()
+
                 ));
 
-        HBox topLeftInfo = new HBox(15, currentLevelLabel, timeElapsedLabel);
-        topLeftInfo.setAlignment(Pos.CENTER_LEFT);
+        HBox infoGroupLeft = new HBox(10, currentLevelLabel, timeElapsedLabel);
+        infoGroupLeft.setAlignment(Pos.CENTER_LEFT);
 
-        HBox statsGroup = new HBox(15, coinsLabel, lossLabel);
-        statsGroup.setAlignment(Pos.CENTER_LEFT);
+        HBox infoGroupMiddle = new HBox(10, wireGroup, spawnedPacketsLabel);
+        infoGroupMiddle.setAlignment(Pos.CENTER_LEFT);
+
+        HBox statsGroupRight = new HBox(10, coinsLabel, lossLabel);
+        statsGroupRight.setAlignment(Pos.CENTER_LEFT);
 
         Region spacer1 = new Region();
         HBox.setHgrow(spacer1, Priority.ALWAYS);
         Region spacer2 = new Region();
+        HBox.setHgrow(spacer2, Priority.ALWAYS);
+
 
         this.getChildren().clear();
-        this.getChildren().addAll(topLeftInfo, wireGroup, spacer1, statsGroup, spacer2, startGameButton);
+        this.getChildren().addAll(infoGroupLeft, spacer1, infoGroupMiddle, spacer2, statsGroupRight, startGameButton);
 
         this.setVisible(true);
         this.setMouseTransparent(false);

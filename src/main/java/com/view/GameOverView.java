@@ -3,10 +3,12 @@ package com.view;
 import com.blueprinthell.Config;
 import com.blueprinthell.MainApplication;
 import com.controller.MenuController;
+import com.model.GameState;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
@@ -14,81 +16,116 @@ import javafx.scene.text.FontWeight;
 
 public class GameOverView extends VBox {
 
-    public GameOverView(MainApplication mainApp, boolean success, int score, int packetsLost, int currentLevelNumber) {
+    private final MainApplication mainApp;
+
+    public GameOverView(MainApplication mainApp, boolean success, int score, int packetsLostOrPercentage, int currentLevelPlayed) {
+        this.mainApp = mainApp;
+
         this.setAlignment(Pos.CENTER);
-        this.setSpacing(25);
+        this.setSpacing(20);
         this.setPadding(new Insets(50));
         this.setStyle("-fx-background-color: #20202D;");
 
         Label titleLabel = new Label();
-        titleLabel.setFont(Font.font("Arial", FontWeight.BOLD, 32));
+        titleLabel.setFont(Font.font("Arial", FontWeight.BOLD, 36));
 
-        Label resultLabel = new Label();
-        resultLabel.setFont(Font.font("Arial", FontWeight.BOLD, 24));
+        Label resultMessageLabel = new Label();
+        resultMessageLabel.setFont(Font.font("Arial", FontWeight.BOLD, 20));
+        resultMessageLabel.setWrapText(true);
+        resultMessageLabel.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
 
         if (success) {
-            titleLabel.setText("مرحله تکمیل شد!");
-            titleLabel.setTextFill(Color.LIGHTGREEN);
-            resultLabel.setText(" شما این مرحله را با موفقیت به پایان رساندید.");
+            titleLabel.setText("مرحله " + currentLevelPlayed + " با موفقیت انجام شد!");
+            titleLabel.setTextFill(Color.PALEGREEN);
+            resultMessageLabel.setText("عالی بود! شما توانستید این مرحله را با موفقیت به پایان برسانید.");
         } else {
-            titleLabel.setText("پایان بازی!");
-            titleLabel.setTextFill(Color.INDIANRED);
-            resultLabel.setText("متاسفانه شما در این مرحله شکست خوردید.");
+            titleLabel.setText("پایان بازی در مرحله " + currentLevelPlayed);
+            titleLabel.setTextFill(Color.SALMON);
+            resultMessageLabel.setText("متاسفانه شما در این مرحله موفق نشدید. بیشتر تلاش کنید!");
         }
 
-        Label scoreLabel = new Label("امتیاز شما: " + score + " سکه");
-        scoreLabel.setFont(Font.font("Arial", FontWeight.NORMAL, 18));
-        scoreLabel.setTextFill(Config.COLOR_HUD_TEXT);
+        VBox statsBox = new VBox(10);
+        statsBox.setAlignment(Pos.CENTER);
+        statsBox.setPadding(new Insets(10, 0, 20, 0));
 
-        Label packetsLostLabel = new Label("پاکت‌های از دست رفته: " + packetsLost);
-        packetsLostLabel.setFont(Font.font("Arial", FontWeight.NORMAL, 18));
-        packetsLostLabel.setTextFill(Config.COLOR_HUD_TEXT);
+        Label scoreLabel = new Label("سکه های کسب شده: " + score);
+        styleStatsLabel(scoreLabel);
 
 
-        VBox buttonsBox = new VBox(15);
+        Label lossLabel = new Label("میزان از دست رفتن پاکت‌ها (بر اساس اندازه): " + packetsLostOrPercentage + "%");
+        styleStatsLabel(lossLabel);
+        if (success) {
+            lossLabel.setTextFill(Color.LIGHTGRAY);
+        } else {
+            lossLabel.setTextFill(Color.ORANGERED.darker());
+        }
+
+        statsBox.getChildren().addAll(scoreLabel, lossLabel);
+
+        GameState completedGameState = mainApp.getGameStateForGameOver();
+        if (completedGameState != null) {
+            Label requiredPacketsLabel = new Label("تعداد پاکت‌های هدف مرحله: " + completedGameState.getPacketsToSpawnInLevel());
+            styleStatsLabel(requiredPacketsLabel);
+            statsBox.getChildren().add(requiredPacketsLabel);
+        }
+
+        HBox buttonsBox = new HBox(20);
         buttonsBox.setAlignment(Pos.CENTER);
 
-        Button restartButton = new Button("شروع مجدد مرحله " + currentLevelNumber);
+        Button restartButton = new Button("تلاش مجدد (مرحله " + currentLevelPlayed + ")");
         styleMenuButton(restartButton);
         restartButton.setOnAction(e -> {
-            if (mainApp != null) {
-                mainApp.startGame(currentLevelNumber);
+            if (this.mainApp != null) {
+                this.mainApp.startGame(currentLevelPlayed);
             }
         });
 
         Button mainMenuButton = new Button("بازگشت به منوی اصلی");
         styleMenuButton(mainMenuButton);
         mainMenuButton.setOnAction(e -> {
-            if (mainApp != null) {
-                mainApp.showMainMenu(new MenuController(mainApp));
+            if (this.mainApp != null) {
+                this.mainApp.showMainMenu(new MenuController(this.mainApp));
             }
         });
 
         buttonsBox.getChildren().addAll(restartButton, mainMenuButton);
 
         if (success) {
-            int nextLevelNumber = currentLevelNumber + 1;
-            Button nextLevelButton = new Button("رفتن به مرحله " + nextLevelNumber);
-            styleMenuButton(nextLevelButton);
-            nextLevelButton.setOnAction(e -> {
-                if (mainApp != null) {
-                    System.out.println("Attempting to start next level: " + nextLevelNumber);
-                    mainApp.startGame(nextLevelNumber);
-                }
-            });
+
+            int nextLevel = currentLevelPlayed + 1;
+            if (mainApp.hasNextLevel(nextLevel)) {
+                Button nextLevelButton = new Button("رفتن به مرحله " + nextLevel);
+                styleMenuButton(nextLevelButton);
+                nextLevelButton.setOnAction(e -> {
+                    if (this.mainApp != null) {
+                        this.mainApp.startGame(nextLevel);
+                    }
+                });
+                buttonsBox.getChildren().add(nextLevelButton);
+            }
         }
 
+        this.getChildren().addAll(titleLabel, resultMessageLabel, statsBox, buttonsBox);
+    }
 
-        this.getChildren().addAll(titleLabel, resultLabel, scoreLabel, packetsLostLabel, buttonsBox);
+    private void styleStatsLabel(Label label) {
+        label.setFont(Font.font("Arial", FontWeight.NORMAL, 16));
+        label.setTextFill(Config.COLOR_HUD_TEXT);
     }
 
     private void styleMenuButton(Button button) {
-        button.setPrefWidth(220);
-        button.setPrefHeight(45);
-        button.setFont(Font.font("Arial", FontWeight.BOLD, 16));
-        button.setStyle("-fx-background-color: " + formatColorToCss(Config.COLOR_SHOP_BUTTON) +
+        button.setPrefWidth(200);
+        button.setPrefHeight(40);
+        button.setFont(Font.font("Arial", FontWeight.BOLD, 14));
+        String baseStyle = "-fx-background-color: " + formatColorToCss(Config.COLOR_SHOP_BUTTON) +
                 "; -fx-text-fill: " + formatColorToCss(Config.COLOR_SHOP_TEXT) +
-                "; -fx-background-radius: 5;");
+                "; -fx-background-radius: 4;";
+        String hoverStyle = "-fx-background-color: " + formatColorToCss(Config.COLOR_SHOP_BUTTON_HOVER) +
+                "; -fx-text-fill: " + formatColorToCss(Config.COLOR_SHOP_TEXT) +
+                "; -fx-background-radius: 4;";
+        button.setStyle(baseStyle);
+        button.setOnMouseEntered(e -> button.setStyle(hoverStyle));
+        button.setOnMouseExited(e -> button.setStyle(baseStyle));
     }
 
     private String formatColorToCss(Color color) {

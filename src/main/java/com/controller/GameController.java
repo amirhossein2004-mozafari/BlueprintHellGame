@@ -1,10 +1,10 @@
 package com.controller;
 
 import com.blueprinthell.Config;
-import com.model.*;
-import com.view.GameView;
 import com.blueprinthell.MainApplication;
-
+import com.model.*;
+import com.utils.AudioManager;
+import com.view.GameView;
 import javafx.geometry.Point2D;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.MouseEvent;
@@ -14,24 +14,22 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
-import com.utils.AudioManager;
 
 public class GameController {
 
     private final GameState gameState;
     private final GameView gameView;
+    private final MainApplication mainApp;
     private final Random random = new Random();
 
     private boolean isWiring = false;
     private Port wiringStartPort = null;
     private Line tempWire = null;
     private double timeSinceLastPacket = 0.0;
-    private final double PACKET_SPAWN_INTERVAL = 0.5;
-    private final MainApplication mainApp;
 
 
     public GameController(GameState gameState, GameView gameView, MainApplication mainApp) {
-        if(gameState == null || gameView == null || mainApp == null) {
+        if (gameState == null || gameView == null || mainApp == null) {
             throw new IllegalArgumentException("GameState, GameView, and MainApplication cannot be null for GameController");
         }
         this.gameState = gameState;
@@ -39,33 +37,31 @@ public class GameController {
         this.mainApp = mainApp;
     }
 
-
     public void initializeGame() {
         gameState.clearPackets();
         gameState.clearConnections();
+
+        if (gameState != null) {
+            for (SystemNode system : gameState.getSystems()) {
+                system.updateAllPortsActuallyConnectedState();
+            }
+        }
+
         if (gameView != null && gameState != null) {
             gameView.redrawAll(gameState);
-            System.out.println("GameController.initializeGame: GameView redrawn with systems from loaded level.");
-        } else {
-            System.err.println("GameController.initializeGame: GameView or GameState is null. Cannot redraw.");
         }
         checkAndSetAllPortsConnected();
-        System.out.println("Game Initialized based on loaded level. All ports connected: " + gameState.areAllPortsConnected());
+        System.out.println("GameController.initializeGame: Game Initialized. Overall HUD ports connected: " + gameState.areAllPortsConnected());
     }
 
     public void updateGame(double scaledDeltaTime) {
-        if (gameState == null || mainApp == null || gameState.isGameLogicPaused() || !gameState.isGameRunning()) {
+        if (gameState == null || mainApp == null) {
+            return;
+        }
+        if (gameState.isGameLogicPaused() || !gameState.isGameRunning()) {
             return;
         }
 
-        if (!gameState.isGameRunning()) {
-            return;
-        }
-        if (gameState.isLevelTimeUp() && gameState.getPackets().isEmpty()) {
-            System.out.println("Level Time Up & No Packets! Ending level.");
-            mainApp.showGameOver(false, gameState.getCoins(), gameState.getPacketLossCount());
-            return;
-        }
         gameState.incrementGameTime(scaledDeltaTime);
         gameState.updateActiveSkills(scaledDeltaTime);
 
@@ -76,42 +72,60 @@ public class GameController {
         if (!gameState.isSkillActive(ShopSkill.AIRYAMAN)) {
             CollisionDetector.checkPacketPacketCollisions(gameState, gameState.getPackets());
         }
+
         handlePacketMovementAndArrival(scaledDeltaTime);
         updateSystemLogic(scaledDeltaTime);
-        gameView.updatePacketPositions(gameState);
+
+        if (gameView != null) {
+            gameView.updatePacketPositions(gameState);
+        }
         checkEndConditions();
     }
 
     private void spawnNewPackets(double scaledDeltaTime) {
-        timeSinceLastPacket += scaledDeltaTime;
-        if (timeSinceLastPacket >= PACKET_SPAWN_INTERVAL &&
-                gameState.canSpawnMorePackets() &&
-                !gameState.isLevelTimeUp()) {
+        if (gameState == null) return;
 
+        timeSinceLastPacket += scaledDeltaTime;
+
+        if (timeSinceLastPacket >= Config.PACKET_SPAWN_INTERVAL) {
             timeSinceLastPacket = 0.0;
 
-            SystemNode sourceSystem = findRandomSourceSystem(gameState);
+            if (gameState.canSpawnMorePackets() && !gameState.isLevelTimeUp()) {
+                if (gameState.getPackets().size() < Config.MAX_ACTIVE_PACKETS) {
+                    SystemNode sourceSystem = findRandomSourceSystem(gameState);
+                    System.out.println("GC.Spawn: MAX_ACTIVE_PACKETS (" + Config.MAX_ACTIVE_PACKETS + ") reached. Cannot spawn.");
+                    if (sourceSystem != null) {
+                        Connection startConnection = findAnyAvailableConnectionFromSystem(sourceSystem, gameState);
+                        if (startConnection != null) {
+                            PacketType typeToSpawn = random.nextBoolean() ? PacketType.SQUARE : PacketType.TRIANGLE;
+                            Packet newPacket = new Packet(
+                                    typeToSpawn,
+                                    startConnection.getStartPort().getAbsoluteX(),
+                                    startConnection.getStartPort().getAbsoluteY()
+                            );
 
-            if (sourceSystem != null && !sourceSystem.getOutputPorts().isEmpty()) {
-                Connection startConnection = findAnyAvailableConnectionFromSystem(sourceSystem, gameState);
+                            gameState.registerSpawnedPacket(newPacket);
+                            newPacket.startMoving(startConnection);
+                            gameState.addPacket(newPacket);
+                            System.out.println("GC.Spawn: Packet " + typeToSpawn + " spawned from Source " + sourceSystem.hashCode() % 1000 + ". Total successfully spawned: " + gameState.getTotalPacketsSuccessfullySpawnedCount());
 
-                if (startConnection != null) {
-                    PacketType typeToSpawn = random.nextBoolean() ? PacketType.SQUARE : PacketType.TRIANGLE;
-
-                    Packet newPacket = new Packet(typeToSpawn, startConnection.getStartPort().getAbsoluteX(), startConnection.getStartPort().getAbsoluteY());
-
-                    if (gameState.getPackets().size() < 50) {
-                        newPacket.startMoving(startConnection);
-                        gameState.addPacket(newPacket);
-                        System.out.println("Spawned packet: " + typeToSpawn + " from System " + sourceSystem.hashCode()%1000 +
-                                " on PortType: " + startConnection.getStartPort().getPacketType());
+                        } else {System.out.println("GC.Spawn: No available connection from Source System " + sourceSystem.hashCode() % 1000);
+                        }
+                    } else {
                     }
+                } else {
+                }
+            } else {
+                if (!gameState.canSpawnMorePackets()) {
+                }
+                if (gameState.isLevelTimeUp()) {
                 }
             }
         }
     }
 
     private SystemNode findRandomSourceSystem(GameState state) {
+        if (state == null) return null;
         List<SystemNode> sourceSystems = state.getSystems().stream()
                 .filter(s -> s.getRole() == SystemRole.SOURCE && !s.getOutputPorts().isEmpty())
                 .collect(Collectors.toList());
@@ -119,14 +133,14 @@ public class GameController {
             return sourceSystems.get(random.nextInt(sourceSystems.size()));
         }
         for (SystemNode sys : state.getSystems()) {
-            if (!sys.getOutputPorts().isEmpty()) return sys;
+            if (!sys.getOutputPorts().isEmpty() && sys.getRole() == SystemRole.SOURCE) return sys;
         }
         return null;
     }
 
     private Connection findAnyAvailableConnectionFromSystem(SystemNode system, GameState state) {
+        if (system == null || state == null) return null;
         List<Connection> availableConnections = new ArrayList<>();
-        if (system == null) return null;
         for (Port port : system.getOutputPorts()) {
             Connection conn = findConnectionFromPort(port, state);
             if (conn != null && !isConnectionOccupied(conn, state)) {
@@ -140,155 +154,163 @@ public class GameController {
     }
 
     private void handlePacketMovementAndArrival(double scaledDeltaTime) {
-        List<Packet> packetsToRemove = new ArrayList<>();
+        if (gameState == null) {
+            return;
+        }
+
+        List<Packet> packetsToRemoveFromActiveList = new ArrayList<>();
+
         for (Packet packet : new ArrayList<>(gameState.getPackets())) {
-            if (packet.getCurrentSize() <= 0) {
-                gameState.incrementPacketLoss(1);
-                packetsToRemove.add(packet);
-                System.out.println("Packet depleted and lost.");
+            if (packet == null) {
                 continue;
             }
 
-            boolean reachedEnd = packet.update(scaledDeltaTime);
+            if (packet.getCurrentSize() <= 0) {
+                packetsToRemoveFromActiveList.add(packet);
+                continue;
+            }
 
-            if (reachedEnd && !packet.isOffWire()) {
+            boolean reachedEndOnWire = packet.update(scaledDeltaTime);
+
+            if (reachedEndOnWire) {
                 Port destinationPort = packet.getTargetPort();
                 if (destinationPort != null && destinationPort.getParentSystem() != null) {
                     SystemNode destinationSystem = destinationPort.getParentSystem();
                     destinationSystem.receivePacket(packet, gameState);
-                    if (destinationSystem.getRole() == SystemRole.SINK) {
-                        System.out.println("Packet " + packet.getType() + " reached a SINK system!");
+                    if (packet.getCurrentConnection() == null) {
+                        packetsToRemoveFromActiveList.add(packet);
                     }
                 } else {
-                    gameState.incrementPacketLoss(1);
-                    System.out.println("Packet lost - wire leads to invalid target.");
+                    gameState.registerCompletelyLostPacket(packet);
+                    packetsToRemoveFromActiveList.add(packet);
                 }
-                packetsToRemove.add(packet);
             } else if (packet.isOffWire()) {
-                double boundsOffset = Config.SYSTEM_WIDTH;
-                if (packet.getX() < -boundsOffset || packet.getX() > Config.WINDOW_WIDTH + boundsOffset ||
-                        packet.getY() < -boundsOffset || packet.getY() > Config.WINDOW_HEIGHT + boundsOffset) {
-                    gameState.incrementPacketLoss(1);
-                    packetsToRemove.add(packet);
-                    System.out.println("Off-wire packet went OUT OF BOUNDS and lost.");
+                double boundsOffset = Config.OFF_WIRE_BOUNDS_OFFSET;
+                boolean outOfBounds = packet.getX() < -boundsOffset || packet.getX() > Config.WINDOW_WIDTH + boundsOffset ||
+                        packet.getY() < -Config.HUD_HEIGHT - boundsOffset ||
+                        packet.getY() > Config.WINDOW_HEIGHT + boundsOffset;
+
+                if (outOfBounds) {
+                    gameState.registerCompletelyLostPacket(packet);
+                    packetsToRemoveFromActiveList.add(packet);
+                } else {
+                    if (packet.getVelocity().magnitudeSquared() < Config.MIN_VELOCITY_SQUARED_TO_STOP_OFF_WIRE &&
+                            packet.getTimeSpentIdleOffWireSeconds() >= Config.MAX_IDLE_TIME_FOR_OFF_WIRE_PACKET_SECONDS) {
+
+                        gameState.registerCompletelyLostPacket(packet);
+                        packetsToRemoveFromActiveList.add(packet);
+                    }
                 }
             }
         }
-        for (Packet p : packetsToRemove) gameState.removePacket(p);
+
+        for (Packet p : packetsToRemoveFromActiveList) {
+            if (p == null) continue;
+
+            boolean removedFromState = gameState.removePacket(p);
+            String packetIdForLog = getPacketIdSafe(p);
+
+            if (removedFromState) {
+                if (gameView != null) {
+                    gameView.removePacketNode(p);
+                }
+                System.out.println("GC.PacketMovement: Packet " + packetIdForLog + " removed from active game and view.");
+            } else {
+                System.err.println("GC.PacketMovement WARNING: Failed to remove packet " + packetIdForLog + " from gameState's active list (was it already removed or not found?).");
+            }
+        }
     }
 
-
-    private boolean hasPacketDeviated(Packet packet) {
-        if (packet == null) return false;
-
-        Connection conn = packet.getCurrentConnection();
-
-        if (conn == null) {
-            double boundsOffset = Math.max(Config.PORT_VISUAL_SIZE_SQUARE, Config.PORT_VISUAL_SIZE_TRIANGLE) * 1.5;
-            boolean outOfBounds = packet.getX() < -boundsOffset ||
-                    packet.getX() > Config.WINDOW_WIDTH + boundsOffset ||
-                    packet.getY() < -boundsOffset ||
-                    packet.getY() > Config.WINDOW_HEIGHT + boundsOffset;
-            if (outOfBounds) {
-
-            }
-            return outOfBounds;
+    private String getPacketIdSafe(Packet packet) {
+        if (packet == null) {
+            return "[NULL_PACKET_OBJECT]";
         }
-
-        Port startPort = conn.getStartPort();
-        Port endPort = conn.getEndPort();
-
-        if (startPort == null || endPort == null) {
-            System.err.println("Warning: Connection has null start or end port in hasPacketDeviated.");
-            return true;
+        String id = packet.getId();
+        if (id == null || id.isEmpty()) {
+            return "[EMPTY_OR_NULL_ID]";
         }
-
-        double p1x = startPort.getAbsoluteX();
-        double p1y = startPort.getAbsoluteY();
-        double p2x = endPort.getAbsoluteX();
-        double p2y = endPort.getAbsoluteY();
-        double px = packet.getX();
-        double py = packet.getY();
-
-        double l2 = (p1x - p2x) * (p1x - p2x) + (p1y - p2y) * (p1y - p2y);
-
-        if (l2 < 0.0001) {
-            return new Point2D(px, py).distance(p1x, p1y) > Config.COLLISION_DEVIATION_THRESHOLD;
-        }
-
-        double t = ((px - p1x) * (p2x - p1x) + (py - p1y) * (p2y - p1y)) / l2;
-
-        double distanceToLineSegment;
-        if (t < 0.0) {
-            distanceToLineSegment = new Point2D(px, py).distance(p1x, p1y);
-        } else if (t > 1.0) {
-            distanceToLineSegment = new Point2D(px, py).distance(p2x, p2y);
-        } else {
-            double closestX = p1x + t * (p2x - p1x);
-            double closestY = p1y + t * (p2y - p1y);
-            distanceToLineSegment = new Point2D(px, py).distance(closestX, closestY);
-        }
-
-        if (Double.isNaN(distanceToLineSegment)) {
-            System.err.println("Warning: Calculated distance is NaN in hasPacketDeviated for packet " + packet.getType());
-            return false;
-        }
-
-        boolean deviated = distanceToLineSegment > Config.COLLISION_DEVIATION_THRESHOLD;
-        return deviated;
+        return (id.length() < 4) ? id : id.substring(0, 4);
     }
 
     private void updateSystemLogic(double scaledDeltaTime) {
+        if (gameState == null) return;
         for (SystemNode system : gameState.getSystems()) {
             system.update(scaledDeltaTime, gameState);
         }
     }
 
     private void checkEndConditions() {
-        if (gameState.getTotalPacketsSpawned() > 0) {
-            if (gameState.getPacketLossPercentage() >= Config.MAX_PACKET_LOSS_PERCENTAGE) {
-                System.out.println("GAME OVER - Packet Loss limit reached!");
-                mainApp.showGameOver(false, gameState.getCoins(), gameState.getPacketLossCount());
+        if (gameState == null || mainApp == null || !gameState.isGameRunning()) {
+            return;
+        }
+
+        if (gameState.getTotalInitialSizeOfSpawnedPackets() > 0 &&
+                gameState.getPacketLossPercentageBySize() >= Config.MAX_PACKET_LOSS_PERCENTAGE) {
+
+            System.out.println("GC.EndConditions: GAME OVER - Packet Loss limit reached! Loss: " +
+                    String.format("%.1f%%", gameState.getPacketLossPercentageBySize()));
+            gameState.setGameRunning(false);
+            mainApp.showGameOver(false, gameState.getCoins(), (int) gameState.getPacketLossPercentageBySize());
+            return;
+        }
+
+        boolean noMorePacketsToSpawn = !gameState.canSpawnMorePackets() || gameState.isLevelTimeUp();
+        boolean allSpawnedPacketsAccountedFor = gameState.getPackets().isEmpty();
+
+        boolean allSystemsProcessedTheirPackets = true;
+        for (SystemNode system : gameState.getSystems()) {
+            if (system.getRole() == SystemRole.INTERMEDIATE && system.getStoredPacketCount() > 0) {
+                allSystemsProcessedTheirPackets = false;
+                break;
             }
         }
 
-        if (gameState.isLevelTimeUp() && !gameState.canSpawnMorePackets() && gameState.getPackets().isEmpty()) {
-            System.out.println("Level time up and all spawned packets processed. Calculating result...");
-            if(gameState.getPacketLossPercentage() < Config.MAX_PACKET_LOSS_PERCENTAGE) {
-                System.out.println("Level WON (Time up, loss within limits). Implement proper win condition logic.");
+        if (noMorePacketsToSpawn && allSpawnedPacketsAccountedFor && allSystemsProcessedTheirPackets) {
+
+            gameState.setGameRunning(false);
+
+            double finalLossPercentage = gameState.getPacketLossPercentageBySize();
+            String finalLossString = String.format("%.1f%%", finalLossPercentage);
+
+            int requiredPackets = gameState.getPacketsToSpawnInLevel();
+
+
+
+            if (gameState.getTotalInitialSizeOfSpawnedPackets() == 0 && requiredPackets > 0) {
+                mainApp.showGameOver(false, gameState.getCoins(), 100);
+            } else if (finalLossPercentage < Config.MAX_PACKET_LOSS_PERCENTAGE) {
+                mainApp.showGameOver(true, gameState.getCoins(), (int) finalLossPercentage);
             } else {
+                mainApp.showGameOver(false, gameState.getCoins(), (int) finalLossPercentage);
+            }
+        } else if (gameState.isLevelTimeUp() && !allSpawnedPacketsAccountedFor && !allSystemsProcessedTheirPackets) {
+
+            if (gameState.getTotalPacketsSuccessfullySpawnedCount() == 0 && gameState.getPacketsToSpawnInLevel() > 0) {
+                gameState.setGameRunning(false);
+                mainApp.showGameOver(false, gameState.getCoins(), 100);
+                return;
             }
         }
     }
 
-
     public void handleMousePress(MouseEvent event) {
-        if (isWiring) return;
-
+        if (isWiring || gameView == null) return;
         Point2D localClick = gameView.sceneToLocal(event.getSceneX(), event.getSceneY());
-        System.out.println("Mouse Scene Coords: (" + event.getSceneX() + ", " + event.getSceneY() + ")");
-        System.out.println("Mouse GameView Local Coords: (" + localClick.getX() + ", " + localClick.getY() + ")");
-
         Port clickedPort = findClickedPort(localClick.getX(), localClick.getY(), PortType.OUTPUT);
 
-        if (clickedPort != null  ) {
+        if (clickedPort != null && !clickedPort.isConnected()) {
             isWiring = true;
             wiringStartPort = clickedPort;
-
-            tempWire = new Line(clickedPort.getAbsoluteX(), clickedPort.getAbsoluteY(),
-                    localClick.getX(), localClick.getY());
-
+            tempWire = new Line(clickedPort.getAbsoluteX(), clickedPort.getAbsoluteY(), localClick.getX(), localClick.getY());
             tempWire.setStrokeWidth(Config.WIRE_THICKNESS);
             tempWire.setStroke(Config.COLOR_WIRE_TEMP_INVALID);
             tempWire.setMouseTransparent(true);
             gameView.addNode(tempWire);
-        } else {
-            System.out.println("Click was not on a valid output port (using local coords).");
         }
     }
 
     public void handleMouseDrag(MouseEvent event) {
-        if (isWiring && tempWire != null) {
+        if (isWiring && tempWire != null && wiringStartPort != null && gameView != null && gameState != null) {
             Point2D localDrag = gameView.sceneToLocal(event.getSceneX(), event.getSceneY());
             tempWire.setEndX(localDrag.getX());
             tempWire.setEndY(localDrag.getY());
@@ -297,8 +319,7 @@ public class GameController {
             double currentTempLength = new Point2D(wiringStartPort.getAbsoluteX(), wiringStartPort.getAbsoluteY())
                     .distance(localDrag.getX(), localDrag.getY());
 
-            if (potentialTargetPort != null &&
-                    potentialTargetPort.getType() == PortType.INPUT &&
+            if (potentialTargetPort != null && !potentialTargetPort.isConnected() &&
                     isValidConnectionAttempt(wiringStartPort, potentialTargetPort) &&
                     gameState.getRemainingWireLength() >= currentTempLength) {
                 tempWire.setStroke(Config.COLOR_WIRE_TEMP_VALID);
@@ -310,60 +331,28 @@ public class GameController {
 
     public void handleMouseRelease(MouseEvent event) {
         boolean connectionMadeSuccessfully = false;
-
         if (isWiring && wiringStartPort != null && tempWire != null && gameState != null && gameView != null) {
             Point2D localReleaseCoords = gameView.sceneToLocal(event.getSceneX(), event.getSceneY());
-
             Port targetPort = findClickedPort(localReleaseCoords.getX(), localReleaseCoords.getY(), PortType.INPUT);
 
-            System.out.println("MouseRelease - Attempting to connect from: " + wiringStartPort.getPacketType() +
-                    " on system " + wiringStartPort.getParentSystem().hashCode() % 1000);
-            if (targetPort != null) {
-                System.out.println("MouseRelease - Potential target port: " + targetPort.getPacketType() +
-                        " on system " + targetPort.getParentSystem().hashCode() % 1000 +
-                        ", IsConnected: " + targetPort.isConnected() +
-                        ", StorageFull (if not SINK): " + (targetPort.getParentSystem().getRole() != SystemRole.SINK && targetPort.getParentSystem().isStorageFull()));
-            } else {
-                System.out.println("MouseRelease - No target port found at release point.");
-            }
-
-            if (targetPort != null && targetPort.isConnected()) {
-                System.out.println("Wiring FAILED (in release): Target port is already connected to another wire.");
-            } else if (isValidConnectionAttempt(wiringStartPort, targetPort)) {
+            if (targetPort != null && !targetPort.isConnected() && isValidConnectionAttempt(wiringStartPort, targetPort)) {
                 double requiredLength = new Point2D(wiringStartPort.getAbsoluteX(), wiringStartPort.getAbsoluteY())
                         .distance(targetPort.getAbsoluteX(), targetPort.getAbsoluteY());
-
                 if (gameState.getRemainingWireLength() >= requiredLength) {
                     if (gameState.useWire(requiredLength)) {
                         Connection newConnection = new Connection(wiringStartPort, targetPort);
                         gameState.addConnection(newConnection);
                         connectionMadeSuccessfully = true;
-                        System.out.println("Connection CREATED! From Port (" + wiringStartPort.getPacketType() + ") to Port (" +
-                                targetPort.getPacketType() + "). Length: " + String.format("%.0f", requiredLength) +
-                                ", Remaining Wire: " + String.format("%.0f", gameState.getRemainingWireLength()));
-
                         AudioManager.playSoundEffect(AudioManager.SFX_CONNECT_SUCCESS);
-
-                    } else {
-                        System.out.println("Wiring FAILED (in release): Could not use wire (error in useWire logic despite available length).");
+                        System.out.println("GC.Wire: Connection CREATED. Length: " + String.format("%.0f", requiredLength));
                     }
                 } else {
-                    System.out.println("Wiring FAILED (in release): Not enough wire length. Required: " +
-                            String.format("%.0f", requiredLength) +
-                            ", Available: " + String.format("%.0f", gameState.getRemainingWireLength()));
+                    System.out.println("GC.Wire: FAILED - Not enough wire. Required: " + String.format("%.0f", requiredLength));
                 }
             } else {
-                System.out.println("Wiring FAILED (in release): isValidConnectionAttempt returned false.");
-                if (targetPort == null) {
-                    System.out.println("Reason (isValid): Target port is null.");
-                } else if (targetPort.getType() != PortType.INPUT) {
-                    System.out.println("Reason (isValid): Target port is not an INPUT port.");
-                }
+                String reason = (targetPort == null) ? "No target port." : (!isValidConnectionAttempt(wiringStartPort, targetPort)) ? "Invalid attempt." : "Target already connected.";
+                System.out.println("GC.Wire: FAILED - " + reason);
             }
-        } else {
-            if (!isWiring) System.out.println("MouseRelease: Not in wiring mode.");
-            if (wiringStartPort == null) System.out.println("MouseRelease: wiringStartPort is null.");
-            if (tempWire == null) System.out.println("MouseRelease: tempWire is null (might be normal if click was not on a port).");
         }
 
         isWiring = false;
@@ -373,71 +362,58 @@ public class GameController {
             tempWire = null;
         }
 
+        if (gameState != null) {
+            for (SystemNode system : gameState.getSystems()) {
+                system.updateAllPortsActuallyConnectedState();
+            }
+        }
+
         if (gameView != null && gameState != null) {
             gameView.redrawAll(gameState);
             checkAndSetAllPortsConnected();
-            System.out.println("Mouse Release completed. GameView redrawn. All ports connected status: " + gameState.areAllPortsConnected());
         }
     }
 
     private void checkAndSetAllPortsConnected() {
-        if (gameState == null || gameState.getSystems().isEmpty()) {
+        if (gameState == null) return;
+        if (gameState.getSystems().isEmpty()) {
             gameState.updateAllPortsConnectedStatus(false);
             return;
         }
+        boolean allRequiredPortsConnected = true;
         for (SystemNode system : gameState.getSystems()) {
-            for (Port port : system.getInputPorts()) {
-                if (!port.isConnected()) {
-                    gameState.updateAllPortsConnectedStatus(false);
-                    return;
-                }
-            }
-            for (Port port : system.getOutputPorts()) {
-                if (!port.isConnected()) {
-                    gameState.updateAllPortsConnectedStatus(false);
-                    return;
-                }
+
+            if (!system.areAllNodePortsConnected()) {
+                allRequiredPortsConnected = false;
+                break;
             }
         }
-        gameState.updateAllPortsConnectedStatus(true);
+        gameState.updateAllPortsConnectedStatus(allRequiredPortsConnected);
     }
 
     public void handleKeyPress(KeyCode code) {
         if (gameState == null) return;
         if (code == Config.KEY_TIME_FORWARD) {
-            double newScale = gameState.getCurrentTimeScale() + Config.TIME_SCALE_INCREMENT;
-            gameState.setCurrentTimeScale(newScale);
-            System.out.println("Time scale increased to: " + String.format("%.1f", gameState.getCurrentTimeScale()));
+            gameState.setCurrentTimeScale(gameState.getCurrentTimeScale() + Config.TIME_SCALE_INCREMENT);
+            System.out.println("Time scale: " + String.format("%.1f", gameState.getCurrentTimeScale()));
         } else if (code == Config.KEY_TIME_BACKWARD) {
-            double newScale = gameState.getCurrentTimeScale() - Config.TIME_SCALE_INCREMENT;
-            gameState.setCurrentTimeScale(newScale);
-            System.out.println("Time scale decreased to: " + String.format("%.1f", gameState.getCurrentTimeScale()));
+            gameState.setCurrentTimeScale(gameState.getCurrentTimeScale() - Config.TIME_SCALE_INCREMENT);
+            System.out.println("Time scale: " + String.format("%.1f", gameState.getCurrentTimeScale()));
         }
     }
 
-
     private Port findClickedPort(double clickX, double clickY, PortType typeToFind) {
+        if (gameState == null) return null;
         for (SystemNode system : gameState.getSystems()) {
             List<Port> portsToCheck = (typeToFind == PortType.INPUT) ? system.getInputPorts() : system.getOutputPorts();
             for (Port port : portsToCheck) {
                 if (port.getType() == typeToFind) {
                     double portCenterX = port.getAbsoluteX();
                     double portCenterY = port.getAbsoluteY();
+                    double size = (port.getPacketType() == PacketType.SQUARE) ? Config.PORT_VISUAL_SIZE_SQUARE : Config.PORT_VISUAL_SIZE_TRIANGLE;
+                    double hitRadius = size + Config.PORT_CLICK_PADDING;
 
-                    double effectiveRadius;
-                    if (port.getPacketType() == PacketType.SQUARE) {
-                        effectiveRadius = Config.PORT_VISUAL_SIZE_SQUARE;
-                    } else {
-                        effectiveRadius = Config.PORT_VISUAL_SIZE_TRIANGLE;
-                    }
-
-                    double clickPadding = 1.5;
-                    double hitRadius = effectiveRadius + clickPadding;
-
-                    double distanceSquared = Math.pow(clickX - portCenterX, 2) + Math.pow(clickY - portCenterY, 2);
-
-                    if (distanceSquared < hitRadius * hitRadius) {
-                        System.out.println("Found Port via distance: " + port.getPacketType());
+                    if (Math.pow(clickX - portCenterX, 2) + Math.pow(clickY - portCenterY, 2) < hitRadius * hitRadius) {
                         return port;
                     }
                 }
@@ -446,99 +422,47 @@ public class GameController {
         return null;
     }
 
-    private Connection findAvailableConnectionFromSystem(SystemNode system, GameState state) {
-        List<Connection> availableConnections = new ArrayList<>();
-        for (Port port : system.getOutputPorts()) {
-            Connection conn = findConnectionFromPort(port, state);
-            if (conn != null && !isConnectionOccupied(conn, state)) {
-                availableConnections.add(conn);
+    private Connection findConnectionFromPort(Port port, GameState state) {
+        if (port == null || state == null) return null;
+        for(Connection conn : state.getConnections()){
+            if(conn.getStartPort() == port || conn.getEndPort() == port){
+                return conn;
             }
         }
-        if (!availableConnections.isEmpty()) {
-            return availableConnections.get(random.nextInt(availableConnections.size()));
-        }
         return null;
     }
 
-    private boolean isValidConnectionAttempt(Port startPort, Port targetPort) {
-        if (startPort == null || targetPort == null) {
-            return false;
-        }
-        if (targetPort.getType() != PortType.INPUT) {
-            return false;
-        }
-        if (startPort.getType() != PortType.OUTPUT) {
-            return false;
-        }
-        if (startPort.getParentSystem() == targetPort.getParentSystem()) {
-            return false;
-        }
-        if (startPort.getPacketType() != targetPort.getPacketType()) {
-            return false;
-        }
-
-        if (targetPort.getParentSystem().isStorageFull() && targetPort.getParentSystem().getRole() != SystemRole.SINK) {
-            System.out.println("Validation fail: Target system storage is FULL.");
-            return false;
-        }
-
-        return true;
-    }
-
-    private Connection findRandomAvailableConnectionFromSystem(SystemNode system, GameState state) {
-        List<Connection> availableConnections = new ArrayList<>();
-        for (Port port : system.getOutputPorts()) {
-            Connection conn = findConnectionFromPort(port, state);
-            if (conn != null && !isConnectionOccupied(conn, state)) {
-                availableConnections.add(conn);
-            }
-        }
-        if (!availableConnections.isEmpty()) {
-            return availableConnections.get(random.nextInt(availableConnections.size()));
-        }
-        return null;
-    }
-
-    private Connection findConnectionFromPort(Port port, GameState gameState) {
-        if (port == null || gameState == null) return null;
-        for(Connection conn : gameState.getConnections()){
-            if(conn.getStartPort() == port){ return conn; }
-        }
-        return null;
-    }
-
-    private boolean isConnectionOccupied(Connection connection, GameState gameState) {
-        if (connection == null) return true;
+    private boolean isConnectionOccupied(Connection connectionToCheck, GameState gameState) {
+        if (connectionToCheck == null || gameState == null) return true;
         for (Packet packet : gameState.getPackets()) {
-            if (packet.getCurrentConnection() == connection && packet.getProgressOnConnection() > 0.001) {
-                return true;
+            if (packet.getCurrentConnection() == connectionToCheck) {
+                if (packet.getProgressOnConnection() < Config.ARRIVAL_PROGRESS_THRESHOLD - 0.01) {
+                    return true;
+                }
             }
         }
         return false;
     }
 
-    public void pauseGameLogic() {
-        if (gameState != null) {
-            gameState.setGameLogicPaused(true);
-            System.out.println("Game Logic Paused (by GameController call)");
+    private boolean isValidConnectionAttempt(Port startPort, Port targetPort) {
+        if (startPort == null || targetPort == null) return false;
+        if (targetPort.getType() != PortType.INPUT || startPort.getType() != PortType.OUTPUT) return false;
+        if (startPort.getParentSystem() == targetPort.getParentSystem()) return false;
+        if (startPort.getPacketType() != targetPort.getPacketType()) return false;
+        if (targetPort.isConnected()) return false;
+        if (startPort.isConnected()) return false;
+        if (targetPort.getParentSystem().getRole() != SystemRole.SINK && targetPort.getParentSystem().isStorageFull()) {
+            System.out.println("GC.Validation: Target system storage is FULL (and not SINK).");
+            return false;
         }
+        return true;
+    }
+
+    public void pauseGameLogic() {
+        if (gameState != null) gameState.setGameLogicPaused(true);
     }
 
     public void resumeGameLogic() {
-        if (gameState != null) {
-            gameState.setGameLogicPaused(false);
-            System.out.println("Game Logic Resumed by Controller");
-        }
+        if (gameState != null) gameState.setGameLogicPaused(false);
     }
-
-    public void pauseGame() {
-        System.out.println("GameController: Requesting Full Game Pause.");
-        pauseGameLogic();
-    }
-
-    public void resumeGame() {
-        System.out.println("GameController: Requesting Full Game Resume.");
-        resumeGameLogic();
-    }
-
 }

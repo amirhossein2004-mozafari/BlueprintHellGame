@@ -18,9 +18,10 @@ public class GameState {
 
     private final DoubleProperty remainingWireLength;
     private final IntegerProperty coins;
-    private final IntegerProperty packetLossCount;
-    private final IntegerProperty totalPacketsSpawned;
-    private final DoubleProperty packetLossPercentage;
+    private final IntegerProperty totalPacketsSuccessfullySpawnedCount;
+    private final IntegerProperty totalInitialSizeOfSpawnedPackets;
+    private final IntegerProperty totalSizeLost;
+    private final DoubleProperty packetLossPercentageBySize;
     private final DoubleProperty currentTimeScale;
 
     private final int packetsToSpawnInLevel;
@@ -31,13 +32,20 @@ public class GameState {
     private final SimpleDoubleProperty gameTimeElapsedSecondsProperty;
 
     private final Map<ShopSkill, DoubleProperty> activeSkillsDuration;
+    private final BooleanProperty atarSkillActiveProperty;
+    private final BooleanProperty airyamanSkillActiveProperty;
+
     private final BooleanProperty isGameLogicPaused;
     private final BooleanProperty isGameRunning;
     private final BooleanProperty allPortsConnectedProperty;
     private final IntegerProperty currentLevelNumberProperty;
 
+    private final int packetsToSpawnInLevel_value;
+    private final ReadOnlyIntegerWrapper packetsToSpawnInLevelPropertyWrapper;
 
     public GameState(int levelNumber, int packetsToSpawnInLevel, double levelDurationSeconds) {
+        this.packetsToSpawnInLevel_value = packetsToSpawnInLevel;
+        this.packetsToSpawnInLevelPropertyWrapper = new ReadOnlyIntegerWrapper(packetsToSpawnInLevel);
         this.currentLevelNumberProperty = new SimpleIntegerProperty(levelNumber);
         this.packetsToSpawnInLevel = packetsToSpawnInLevel;
         this.levelDurationSeconds = levelDurationSeconds;
@@ -48,14 +56,15 @@ public class GameState {
 
         this.remainingWireLength = new SimpleDoubleProperty(Config.INITIAL_WIRE_LENGTH);
         this.coins = new SimpleIntegerProperty(0);
-        this.packetLossCount = new SimpleIntegerProperty(0);
-        this.totalPacketsSpawned = new SimpleIntegerProperty(0);
+        this.totalPacketsSuccessfullySpawnedCount = new SimpleIntegerProperty(0);
+        this.totalInitialSizeOfSpawnedPackets = new SimpleIntegerProperty(0);
+        this.totalSizeLost = new SimpleIntegerProperty(0);
         this.currentTimeScale = new SimpleDoubleProperty(Config.DEFAULT_TIME_SCALE);
 
-        this.packetLossPercentage = new SimpleDoubleProperty(0.0);
-        this.packetLossPercentage.bind(
-                Bindings.when(this.totalPacketsSpawned.greaterThan(0))
-                        .then(this.packetLossCount.multiply(100.0).divide(this.totalPacketsSpawned))
+        this.packetLossPercentageBySize = new SimpleDoubleProperty(0.0);
+        this.packetLossPercentageBySize.bind(
+                Bindings.when(this.totalInitialSizeOfSpawnedPackets.greaterThan(0))
+                        .then(this.totalSizeLost.multiply(100.0).divide(this.totalInitialSizeOfSpawnedPackets))
                         .otherwise(0.0)
         );
 
@@ -64,6 +73,8 @@ public class GameState {
         this.gameTimeElapsedSecondsProperty = new SimpleDoubleProperty(0.0);
 
         this.activeSkillsDuration = new EnumMap<>(ShopSkill.class);
+        this.atarSkillActiveProperty = new SimpleBooleanProperty(false);
+        this.airyamanSkillActiveProperty = new SimpleBooleanProperty(false);
         for (ShopSkill skill : ShopSkill.values()) {
             if (skill == ShopSkill.ATAR || skill == ShopSkill.AIRYAMAN) {
                 activeSkillsDuration.put(skill, new SimpleDoubleProperty(0.0));
@@ -73,53 +84,59 @@ public class GameState {
         this.isGameLogicPaused = new SimpleBooleanProperty(false);
         this.isGameRunning = new SimpleBooleanProperty(false);
         this.allPortsConnectedProperty = new SimpleBooleanProperty(false);
-
-
-        System.out.println("GameState created for level: " + this.currentLevelNumberProperty.get() +
-                " with packetsToSpawn: " + this.packetsToSpawnInLevel +
-                ", duration: " + this.levelDurationSeconds);
     }
 
     public GameState() {
-        this(1, 30, 90.0);
-        System.out.println("GameState created with default parameters (via no-arg constructor).");
+        this(1,50,180);
     }
-
 
     public void addSystem(SystemNode system) { if (system != null) this.systems.add(system); }
     public List<SystemNode> getSystems() { return Collections.unmodifiableList(systems); }
-    public void clearSystems() {
-        this.systems.clear();
-        System.out.println("GameState: Systems cleared.");
-    }
+    public void clearSystems() { this.systems.clear(); }
 
     public void addPacket(Packet packet) {
         if (packet != null && !this.packets.contains(packet)) {
             this.packets.add(packet);
-            this.totalPacketsSpawned.set(this.totalPacketsSpawned.get() + 1);
-            this.packetsSpawnedThisLevelProperty.set(this.packetsSpawnedThisLevelProperty.get() + 1);
         }
     }
-    public void removePacket(Packet packet) { if (packet != null) this.packets.remove(packet); }
-    public List<Packet> getPackets() { return Collections.unmodifiableList(packets); }
 
+    public boolean removePacket(Packet packet) {
+        if (packet != null && this.packets != null) {
+            return this.packets.remove(packet);
+        }
+        return false;
+    }
+    private String getPacketIdSafeForGameState(Packet packet) {
+        if (packet == null) return "[NULL_PACKET_IN_GS]";
+        String id = packet.getId();
+        if (id == null || id.isEmpty()) return "[NO_ID_IN_GS]";
+        return (id.length() < 4) ? id : id.substring(0, 4);
+    }
+
+    public List<Packet> getPackets() {
+        if (this.packets == null) {
+            return Collections.emptyList();
+        }
+        return Collections.unmodifiableList(this.packets);
+    }
     public void clearPackets() {
         this.packets.clear();
-        this.totalPacketsSpawned.set(0);
-        this.packetLossCount.set(0);
         this.packetsSpawnedThisLevelProperty.set(0);
         this.gameTimeElapsedSeconds = 0.0;
         this.gameTimeElapsedSecondsProperty.set(0.0);
-        System.out.println("GameState: Packets cleared and related stats reset.");
+
+        this.totalPacketsSuccessfullySpawnedCount.set(0);
+        this.totalInitialSizeOfSpawnedPackets.set(0);
+        this.totalSizeLost.set(0);
     }
 
     public void addConnection(Connection connection) { if (connection != null) this.connections.add(connection); }
     public List<Connection> getConnections() { return Collections.unmodifiableList(connections); }
+
     public void clearConnections() {
         this.connections.clear();
         this.remainingWireLength.set(Config.INITIAL_WIRE_LENGTH);
         this.updateAllPortsConnectedStatus(false);
-        System.out.println("GameState: Connections cleared and wire length reset.");
     }
 
     public void incrementGameTime(double deltaTime) {
@@ -127,18 +144,38 @@ public class GameState {
         this.gameTimeElapsedSecondsProperty.set(this.gameTimeElapsedSeconds);
     }
 
-    public boolean canSpawnMorePackets() { return packetsSpawnedThisLevelProperty.get() < packetsToSpawnInLevel; }
+    public void registerSpawnedPacket(Packet packet) {
+        if (packet == null) return;
+        this.totalPacketsSuccessfullySpawnedCount.set(this.totalPacketsSuccessfullySpawnedCount.get() + 1);
+        this.totalInitialSizeOfSpawnedPackets.set(this.totalInitialSizeOfSpawnedPackets.get() + packet.getInitialSize());
+    }
+
+    public void incrementTotalSizeLost(int sizeLostAmount) {
+        if (sizeLostAmount > 0) {
+            this.totalSizeLost.set(this.totalSizeLost.get() + sizeLostAmount);
+        }
+    }
+
+    public void registerCompletelyLostPacket(Packet packet) {
+        if (packet != null && packet.getCurrentSize() > 0) {
+            incrementTotalSizeLost(packet.getCurrentSize());
+        }
+    }
+
+    public boolean canSpawnMorePackets() {
+
+        boolean canSpawn = getTotalPacketsSuccessfullySpawnedCount() < getPacketsToSpawnInLevel();
+        return canSpawn;
+    }
+
     public boolean isLevelTimeUp() { return gameTimeElapsedSeconds >= levelDurationSeconds; }
 
     public double getGameTimeElapsedSeconds() { return gameTimeElapsedSeconds; }
     public SimpleDoubleProperty gameTimeElapsedSecondsProperty() { return gameTimeElapsedSecondsProperty; }
-
     public int getPacketsSpawnedThisLevel() { return packetsSpawnedThisLevelProperty.get(); }
     public SimpleIntegerProperty packetsSpawnedThisLevelProperty() { return packetsSpawnedThisLevelProperty; }
-
     public int getPacketsToSpawnInLevel() { return packetsToSpawnInLevel; }
     public double getLevelDurationSeconds() { return levelDurationSeconds; }
-
 
     public double getRemainingWireLength() { return remainingWireLength.get(); }
     public DoubleProperty remainingWireLengthProperty() { return remainingWireLength; }
@@ -153,22 +190,18 @@ public class GameState {
     public int getCoins() { return coins.get(); }
     public IntegerProperty coinsProperty() { return coins; }
 
-    public void incrementPacketLoss(int amount) {
-        if (amount > 0) {
-            this.packetLossCount.set(this.packetLossCount.get() + amount);
-        }
-    }
-    public int getPacketLossCount() { return packetLossCount.get(); }
-    public IntegerProperty packetLossProperty() { return packetLossCount; }
-    public double getPacketLossPercentage() { return packetLossPercentage.get(); }
-    public DoubleProperty packetLossPercentageProperty() { return packetLossPercentage; }
-    public int getTotalPacketsSpawned() { return totalPacketsSpawned.get(); }
-    public IntegerProperty totalPacketsSpawnedProperty() { return totalPacketsSpawned; }
+    public int getTotalPacketsSuccessfullySpawnedCount() { return totalPacketsSuccessfullySpawnedCount.get(); }
+    public IntegerProperty totalPacketsSuccessfullySpawnedCountProperty() { return totalPacketsSuccessfullySpawnedCount; }
+    public int getTotalInitialSizeOfSpawnedPackets() { return totalInitialSizeOfSpawnedPackets.get(); }
+    public IntegerProperty totalInitialSizeOfSpawnedPacketsProperty() { return totalInitialSizeOfSpawnedPackets; }
+    public int getTotalSizeLost() { return totalSizeLost.get(); }
+    public IntegerProperty totalSizeLostProperty() { return totalSizeLost; }
+    public double getPacketLossPercentageBySize() { return packetLossPercentageBySize.get(); }
+    public DoubleProperty packetLossPercentageBySizeProperty() { return packetLossPercentageBySize; }
 
     public double getCurrentTimeScale() { return currentTimeScale.get(); }
     public void setCurrentTimeScale(double scale) {
-        double newScale = Math.max(Config.MIN_TIME_SCALE, Math.min(Config.MAX_TIME_SCALE, scale));
-        this.currentTimeScale.set(newScale);
+        this.currentTimeScale.set(Math.max(Config.MIN_TIME_SCALE, Math.min(Config.MAX_TIME_SCALE, scale)));
     }
     public DoubleProperty currentTimeScaleProperty() { return currentTimeScale; }
 
@@ -180,22 +213,16 @@ public class GameState {
     public void updateAllPortsConnectedStatus(boolean status) { allPortsConnectedProperty.set(status); }
     public BooleanProperty allPortsConnectedProperty() { return allPortsConnectedProperty; }
 
-
-    private final BooleanProperty atarSkillActiveProperty = new SimpleBooleanProperty(false);
-    private final BooleanProperty airyamanSkillActiveProperty = new SimpleBooleanProperty(false);
-
     public void activateSkill(ShopSkill skill, double durationSeconds) {
         if (skill == null) return;
         if (skill == ShopSkill.ANAHITA) {
             applyAnahitaEffect();
-            System.out.println("Anahita skill activated! Noise cleared.");
             return;
         }
         DoubleProperty currentDurationProp = activeSkillsDuration.computeIfAbsent(skill, k -> new SimpleDoubleProperty(0.0));
         currentDurationProp.set(durationSeconds);
         if (skill == ShopSkill.ATAR) atarSkillActiveProperty.set(true);
         if (skill == ShopSkill.AIRYAMAN) airyamanSkillActiveProperty.set(true);
-        System.out.println(skill.name() + " skill activated. Duration: " + currentDurationProp.get());
     }
 
     public boolean isSkillActive(ShopSkill skill) {
@@ -216,7 +243,6 @@ public class GameState {
                     durationProp.set(0);
                     if (skill == ShopSkill.ATAR) atarSkillActiveProperty.set(false);
                     if (skill == ShopSkill.AIRYAMAN) airyamanSkillActiveProperty.set(false);
-                    System.out.println(skill.name() + " skill expired.");
                 } else {
                     durationProp.set(newDuration);
                 }
@@ -237,6 +263,8 @@ public class GameState {
         }
         return false;
     }
+
+    public ReadOnlyIntegerProperty packetsToSpawnInLevelProperty() { return packetsToSpawnInLevelPropertyWrapper.getReadOnlyProperty(); }
 
     public boolean isGameLogicPaused() { return isGameLogicPaused.get(); }
     public void setGameLogicPaused(boolean paused) { this.isGameLogicPaused.set(paused); }

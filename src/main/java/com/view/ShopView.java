@@ -62,7 +62,7 @@ public class ShopView extends BorderPane {
 
 
         skillsContainer.getChildren().add(createSkillEntryView(
-                "اَتَر (Atar)",
+                "(Atar)",
                 "اثر موج‌های Impact را برای " + (int)Config.ATAR_SKILL_DURATION_SECONDS + " ثانیه غیرفعال می‌کند.",
                 Config.ATAR_SKILL_COST,
                 ShopSkill.ATAR,
@@ -71,7 +71,7 @@ public class ShopView extends BorderPane {
         ));
 
         skillsContainer.getChildren().add(createSkillEntryView(
-                "اَیریامَن (Airyaman)",
+                "(Airyaman)",
                 "برخورد پاکت‌های موجود در شبکه را برای " + (int)Config.AIRYAMAN_SKILL_DURATION_SECONDS + " ثانیه غیرفعال می‌کند.",
                 Config.AIRYAMAN_SKILL_COST,
                 ShopSkill.AIRYAMAN,
@@ -80,7 +80,7 @@ public class ShopView extends BorderPane {
         ));
 
         skillsContainer.getChildren().add(createSkillEntryView(
-                "آناهیتا (Anahita)",
+                "(Anahita)",
                 "نویز تمام پاکت‌های حاضر در شبکه را صفر می‌کند.",
                 Config.ANAHITA_SKILL_COST,
                 ShopSkill.ANAHITA,

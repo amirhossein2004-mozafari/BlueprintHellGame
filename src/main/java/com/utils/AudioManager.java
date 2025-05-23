@@ -117,11 +117,19 @@ public class AudioManager {
     }
 
     public static void stopBackgroundMusic() {
-        stopSpecificBackgroundMusic(backgroundMusicPlayerMenu);
-        backgroundMusicPlayerMenu = null;
-        stopSpecificBackgroundMusic(backgroundMusicPlayerGame);
-        backgroundMusicPlayerGame = null;
-        System.out.println("AudioManager: All background music stopped.");
+        if (backgroundMusicPlayerMenu != null) {
+            backgroundMusicPlayerMenu.stop();
+            backgroundMusicPlayerMenu = null;
+            System.out.println("AudioManager: Menu background music stopped.");
+        }
+        if (backgroundMusicPlayerGame != null) {
+            backgroundMusicPlayerGame.stop();
+            backgroundMusicPlayerGame = null;
+            System.out.println("AudioManager: Game background music stopped.");
+        }
+        if (backgroundMusicPlayerMenu == null && backgroundMusicPlayerGame == null) {
+            System.out.println("AudioManager: All background music players are now null.");
+        }
     }
 
     private static void stopSpecificBackgroundMusic(MediaPlayer player) {

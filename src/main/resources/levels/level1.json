@@ -1,40 +1,32 @@
 {
   "levelNumber": 1,
-  "packetsToSpawn": 30,
-  "levelDurationSeconds": 90.0,
-  "initialWireLength": 5000.0,
+  "packetsToSpawn": 20,
+  "levelDurationSeconds": 120.0,
+  "initialWireLength": 6000.0,
   "systems": [
     {
-      "x": 100, "y": 150, "role": "SOURCE",
-      "ports": {"squareInputs": 0, "triangleInputs": 0, "squareOutputs": 2, "triangleOutputs": 2}
+      "x": 100, "y": 220, "role": "SOURCE",
+      "ports": {"squareInputs": 0, "triangleInputs": 0, "squareOutputs": 1, "triangleOutputs": 2}
     },
     {
-      "x": 400, "y": 100, "role": "INTERMEDIATE",
-      "ports": {"squareInputs": 1, "triangleInputs": 1, "squareOutputs": 1, "triangleOutputs": 0}
+      "x": 400, "y": 160, "role": "INTERMEDIATE",
+      "ports": {"squareInputs": 1, "triangleInputs": 0, "squareOutputs": 1, "triangleOutputs": 0}
     },
     {
-      "x": 700, "y": 200, "role": "INTERMEDIATE",
-      "ports": {"squareInputs": 1, "triangleInputs": 2, "squareOutputs": 2, "triangleOutputs": 1}
+      "x": 500, "y": 320, "role": "INTERMEDIATE",
+      "ports": {"squareInputs": 0, "triangleInputs": 1, "squareOutputs": 1, "triangleOutputs": 1}
     },
     {
-      "x": 170, "y": 400, "role": "INTERMEDIATE",
-      "ports": {"squareInputs": 2, "triangleInputs": 0, "squareOutputs": 1, "triangleOutputs": 1}
+      "x": 550, "y": 500, "role": "INTERMEDIATE",
+      "ports": {"squareInputs": 1, "triangleInputs": 1, "squareOutputs": 0, "triangleOutputs": 2}
     },
     {
-      "x": 380, "y": 300, "role": "INTERMEDIATE",
-      "ports": {"squareInputs": 1, "triangleInputs": 1, "squareOutputs": 1, "triangleOutputs": 2}
+      "x": 300, "y": 400, "role": "INTERMEDIATE",
+      "ports": {"squareInputs": 0, "triangleInputs": 2, "squareOutputs": 0, "triangleOutputs": 2}
     },
     {
-      "x": 680, "y": 430, "role": "INTERMEDIATE",
-      "ports": {"squareInputs": 1, "triangleInputs": 1, "squareOutputs": 1, "triangleOutputs": 0}
-    },
-    {
-      "x": 300, "y": 550, "role": "SINK",
-      "ports": {"squareInputs": 1, "triangleInputs": 1, "squareOutputs": 0, "triangleOutputs": 0}
-    },
-    {
-      "x": 650, "y": 520, "role": "SINK",
-      "ports": {"squareInputs": 1, "triangleInputs": 0, "squareOutputs": 0, "triangleOutputs": 0}
+      "x": 750, "y": 300, "role": "SINK",
+      "ports": {"squareInputs": 1, "triangleInputs": 3, "squareOutputs": 0, "triangleOutputs": 0}
     }
   ]
 }

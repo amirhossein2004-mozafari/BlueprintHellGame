@@ -117,7 +117,6 @@ public class SettingsController {
             case "KEY_TOGGLE_HUD": return Config.KEY_TOGGLE_HUD;
             case "KEY_PAUSE": return Config.KEY_PAUSE;
             case "KEY_EXIT_TO_MENU": return Config.KEY_EXIT_TO_MENU;
-            // case "KEY_EXECUTE_RUN": return Config.KEY_EXECUTE_RUN;
             default:
                 return null;
         }

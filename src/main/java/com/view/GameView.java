@@ -163,7 +163,13 @@ public class GameView extends Pane {
         indicatorRect.setY(system.getY() + Config.INDICATOR_Y_POS);
         indicatorRect.setWidth(indicatorWidth);
         indicatorRect.setHeight(Config.INDICATOR_HEIGHT);
-        indicatorRect.setFill(system.isIndicatorOn() ? Config.COLOR_SYSTEM_INDICATOR_ON : Config.COLOR_SYSTEM_INDICATOR_OFF);
+
+        if (system.isAllPortsActuallyConnected()) {
+            indicatorRect.setFill(Config.COLOR_SYSTEM_INDICATOR_ON);
+        } else {
+            indicatorRect.setFill(Config.COLOR_SYSTEM_INDICATOR_OFF);
+        }
+
         indicatorRect.setArcWidth(3);
         indicatorRect.setArcHeight(3);
         this.getChildren().add(indicatorRect);

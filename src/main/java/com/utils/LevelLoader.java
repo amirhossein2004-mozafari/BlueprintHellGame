@@ -40,8 +40,8 @@ public class LevelLoader {
                             ". Using requested number: " + levelNumberToLoad);
                 }
 
-                int packetsToSpawn = levelJson.optInt("packetsToSpawn", 30);
-                double levelDuration = levelJson.optDouble("levelDurationSeconds", 90.0);
+                int packetsToSpawn = levelJson.optInt("packetsToSpawn", 50);
+                double levelDuration = levelJson.optDouble("levelDurationSeconds", 180.0);
 
                 GameState gameState = new GameState(levelNumberToLoad, packetsToSpawn, levelDuration);
 
@@ -78,12 +78,12 @@ public class LevelLoader {
             System.err.println("LevelLoader IO Error: Reading level " + levelNumberToLoad + " from file: " + fileName);
             e.printStackTrace();
             System.err.println("LevelLoader: Returning a default GameState for level " + levelNumberToLoad + " due to IO error.");
-            return new GameState(levelNumberToLoad, 30, 90.0);
+            return new GameState(levelNumberToLoad, 50, 180.0);
         } catch (Exception e) {
             System.err.println("LevelLoader Error: Processing level " + levelNumberToLoad + " from file: " + fileName);
             e.printStackTrace();
             System.err.println("LevelLoader: Returning a default GameState for level " + levelNumberToLoad + " due to processing error.");
-            return new GameState(levelNumberToLoad, 30, 90.0);
+            return new GameState(levelNumberToLoad, 50, 180.0);
         }
     }
 }
