@@ -3,6 +3,7 @@ module com.blueprinthell {
     requires javafx.graphics;
     requires javafx.media;
     requires org.json;
+    requires java.desktop;
 
     exports com.blueprinthell;
     exports com.controller;

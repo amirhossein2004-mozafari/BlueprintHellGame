@@ -3,6 +3,7 @@ package com.view;
 import com.blueprinthell.Config;
 import com.model.*;
 
+import javafx.beans.binding.Bindings;
 import javafx.scene.Node;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
@@ -10,6 +11,7 @@ import javafx.scene.shape.*;
 import javafx.scene.control.Label;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
+import javafx.geometry.Point2D;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -55,21 +57,44 @@ public class GameView extends Pane {
         }
     }
 
+
     private void drawSingleWire(Connection connection) {
-        Line wireLine = new Line(
-                connection.getStartPort().getAbsoluteX(),
-                connection.getStartPort().getAbsoluteY(),
-                connection.getEndPort().getAbsoluteX(),
-                connection.getEndPort().getAbsoluteY()
-        );
-        wireLine.setStroke(Config.COLOR_WIRE_NORMAL);
-        wireLine.setStrokeWidth(Config.WIRE_THICKNESS);
-        wireLine.setMouseTransparent(true);
-        this.getChildren().add(wireLine);
+        List<Point2D> path = connection.getFullPath();
+        if (path.size() < 2) return;
+
+
+        for (int i = 0; i < path.size() - 1; i++) {
+            Point2D startPoint = path.get(i);
+            Point2D endPoint = path.get(i + 1);
+
+            Line wireSegment = new Line(
+                    startPoint.getX(), startPoint.getY(),
+                    endPoint.getX(), endPoint.getY()
+            );
+            wireSegment.setStroke(Config.COLOR_WIRE_NORMAL);
+            wireSegment.setStrokeWidth(Config.WIRE_THICKNESS);
+            wireSegment.setMouseTransparent(true);
+            this.getChildren().add(wireSegment);
+        }
+
+        for (int i = 1; i < path.size() - 1; i++) {
+            Point2D bendPoint = path.get(i);
+            Circle bendCircle = new Circle(bendPoint.getX(), bendPoint.getY(), 4, Config.COLOR_WIRE_HIGHLIGHT);
+            bendCircle.setStroke(Color.BLACK);
+            bendCircle.setStrokeWidth(1);
+            this.getChildren().add(bendCircle);
+        }
     }
 
     private void drawSingleSystem(SystemNode system) {
         Rectangle systemBody = new Rectangle(system.getX(), system.getY(), system.getWidth(), system.getHeight());
+
+        if (system.getRole() == SystemRole.VPN) {
+            systemBody.setFill(Color.STEELBLUE);
+        } else {
+            systemBody.setFill(Config.COLOR_SYSTEM_RECT);
+        }
+
         systemBody.setFill(Config.COLOR_SYSTEM_RECT);
         systemBody.setStroke(Color.BLACK);
         systemBody.setStrokeWidth(1);
@@ -89,22 +114,23 @@ public class GameView extends Pane {
         drawPortsForSystem(system.getInputPorts());
         drawPortsForSystem(system.getOutputPorts());
 
+
         Label storedCountLabel = new Label();
-        String labelText = system.getStoredPacketCount() + "/" + Config.SYSTEM_PACKET_STORAGE_CAPACITY;
-        storedCountLabel.setText(labelText);
+        storedCountLabel.textProperty().bind(
+                Bindings.format("%d/%d",
+                        system.getStoredPacketCount(),
+                        Config.SYSTEM_PACKET_STORAGE_CAPACITY
+                )
+        );
         storedCountLabel.setFont(Font.font("Arial", FontWeight.BOLD, 10));
         storedCountLabel.setTextFill(Color.WHITE);
 
-        double labelX = system.getX() + Config.SYSTEM_DIVIDER_X_OFFSET / 2.0 - storedCountLabel.prefWidth(-1) / 2.0;
-        double labelY = system.getY() + Config.INDICATOR_Y_POS + Config.INDICATOR_HEIGHT + 2;
 
-        labelX = system.getX() + 3;
-        labelY = system.getY() + system.getHeight() - 12 - 3;
-
+        double labelX = system.getX() + 3;
+        double labelY = system.getY() + system.getHeight() - 15;
         storedCountLabel.setLayoutX(labelX);
         storedCountLabel.setLayoutY(labelY);
         storedCountLabel.setMouseTransparent(true);
-
         this.getChildren().add(storedCountLabel);
     }
 
@@ -198,7 +224,7 @@ public class GameView extends Pane {
         double size;
         double x = packet.getX();
         double y = packet.getY();
-        Node node = null;
+        Shape node = null;
 
         if (packet.getType() == PacketType.SQUARE) {
             size = Config.PORT_VISUAL_SIZE_SQUARE * 2;
@@ -212,9 +238,18 @@ public class GameView extends Pane {
             poly.getPoints().addAll( x, y - height * (2.0/3.0), x - size / 2.0, y + height * (1.0/3.0), x + size / 2.0, y + height * (1.0/3.0) );
             poly.setFill(Config.COLOR_PACKET_TRIANGLE);
             node = poly;
+        }  else if (packet.getType() == PacketType.PROTECTED) {
+            size = 8;
+            node = new Circle(x, y, size / 2.0);
+            node.setFill(Color.DODGERBLUE);
+            node.setStroke(Color.WHITE);
+            node.setStrokeWidth(1.5);
         }
 
-        if(node instanceof Shape) { ((Shape)node).setStroke(Color.DARKSLATEGRAY); ((Shape)node).setStrokeWidth(0.5); }
+        if(node != null) {
+            node.setStroke(node.getStroke() != null ? node.getStroke() : Color.DARKSLATEGRAY);
+            node.setStrokeWidth(node.getStrokeWidth() > 0 ? node.getStrokeWidth() : 0.5);
+        }
         return node;
     }
 

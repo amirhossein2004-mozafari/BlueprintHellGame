@@ -1,0 +1,26 @@
+{
+  "levelNumber": 3,
+  "packetsToSpawn": 10,
+  "levelDurationSeconds": 120.0,
+  "initialWireLength": 5000.0,
+  "systems": [
+    {
+      "x": 100,
+      "y": 300,
+      "role": "SOURCE",
+      "ports": { "squareOutputs": 1 }
+    },
+    {
+      "x": 400,
+      "y": 300,
+      "role": "VPN",
+      "ports": { "squareInputs": 1, "squareOutputs": 1 }
+    },
+    {
+      "x": 700,
+      "y": 300,
+      "role": "SINK",
+      "ports": { "squareInputs": 1 }
+    }
+  ]
+}

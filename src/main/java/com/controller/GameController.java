@@ -27,6 +27,10 @@ public class GameController {
     private Line tempWire = null;
     private double timeSinceLastPacket = 0.0;
 
+    private boolean isDraggingBendPoint = false;
+    private Connection activeConnection = null;
+    private int activeBendPointIndex = -1;
+
 
     public GameController(GameState gameState, GameView gameView, MainApplication mainApp) {
         if (gameState == null || gameView == null || mainApp == null) {
@@ -294,11 +298,29 @@ public class GameController {
     }
 
     public void handleMousePress(MouseEvent event) {
-        if (isWiring || gameView == null) return;
-        Point2D localClick = gameView.sceneToLocal(event.getSceneX(), event.getSceneY());
-        Port clickedPort = findClickedPort(localClick.getX(), localClick.getY(), PortType.OUTPUT);
+        if (gameView == null || isWiring || isDraggingBendPoint) return;
 
+        Point2D localClick = gameView.sceneToLocal(event.getSceneX(), event.getSceneY());
+
+        final double BEND_POINT_CLICK_RADIUS = 6.0;
+        for (Connection conn : gameState.getConnections()) {
+            List<Point2D> bendPoints = conn.getBendPoints();
+            for (int i = 0; i < bendPoints.size(); i++) {
+                if (bendPoints.get(i).distance(localClick) < BEND_POINT_CLICK_RADIUS) {
+
+                    isDraggingBendPoint = true;
+                    activeConnection = conn;
+                    activeBendPointIndex = i;
+                    System.out.println("Started dragging bend point " + i + " of connection " + conn.getId());
+                    return;
+                }
+            }
+        }
+
+
+        Port clickedPort = findClickedPort(localClick.getX(), localClick.getY(), PortType.OUTPUT);
         if (clickedPort != null && !clickedPort.isConnected()) {
+
             isWiring = true;
             wiringStartPort = clickedPort;
             tempWire = new Line(clickedPort.getAbsoluteX(), clickedPort.getAbsoluteY(), localClick.getX(), localClick.getY());
@@ -306,12 +328,32 @@ public class GameController {
             tempWire.setStroke(Config.COLOR_WIRE_TEMP_INVALID);
             tempWire.setMouseTransparent(true);
             gameView.addNode(tempWire);
+            return;
+        }
+
+
+        Connection clickedConnection = findClickedConnection(localClick.getX(), localClick.getY());
+        if (clickedConnection != null) {
+            System.out.println("Wire clicked! Attempting to add a bend point.");
+            if (gameState.getCoins() >= 1) {
+                if (gameState.decreaseCoins(1)) {
+                    clickedConnection.addBendPoint(localClick);
+                    System.out.println("Bend point added to connection " + clickedConnection.getId());
+
+                    gameView.redrawAll(gameState);
+                }
+            } else {
+                System.out.println("Not enough coins to add a bend point!");
+            }
         }
     }
 
     public void handleMouseDrag(MouseEvent event) {
-        if (isWiring && tempWire != null && wiringStartPort != null && gameView != null && gameState != null) {
-            Point2D localDrag = gameView.sceneToLocal(event.getSceneX(), event.getSceneY());
+        if (gameView == null) return;
+        Point2D localDrag = gameView.sceneToLocal(event.getSceneX(), event.getSceneY());
+
+
+        if (isWiring && tempWire != null && wiringStartPort != null) {
             tempWire.setEndX(localDrag.getX());
             tempWire.setEndY(localDrag.getY());
 
@@ -327,51 +369,54 @@ public class GameController {
                 tempWire.setStroke(Config.COLOR_WIRE_TEMP_INVALID);
             }
         }
+
+        else if (isDraggingBendPoint && activeConnection != null) {
+            activeConnection.moveBendPoint(activeBendPointIndex, localDrag);
+
+            gameView.redrawAll(gameState);
+        }
     }
 
     public void handleMouseRelease(MouseEvent event) {
-        boolean connectionMadeSuccessfully = false;
-        if (isWiring && wiringStartPort != null && tempWire != null && gameState != null && gameView != null) {
+
+        if (isWiring && wiringStartPort != null && tempWire != null) {
+            boolean connectionMadeSuccessfully = false;
             Point2D localReleaseCoords = gameView.sceneToLocal(event.getSceneX(), event.getSceneY());
             Port targetPort = findClickedPort(localReleaseCoords.getX(), localReleaseCoords.getY(), PortType.INPUT);
 
             if (targetPort != null && !targetPort.isConnected() && isValidConnectionAttempt(wiringStartPort, targetPort)) {
                 double requiredLength = new Point2D(wiringStartPort.getAbsoluteX(), wiringStartPort.getAbsoluteY())
                         .distance(targetPort.getAbsoluteX(), targetPort.getAbsoluteY());
+
                 if (gameState.getRemainingWireLength() >= requiredLength) {
                     if (gameState.useWire(requiredLength)) {
                         Connection newConnection = new Connection(wiringStartPort, targetPort);
                         gameState.addConnection(newConnection);
                         connectionMadeSuccessfully = true;
                         AudioManager.playSoundEffect(AudioManager.SFX_CONNECT_SUCCESS);
-                        System.out.println("GC.Wire: Connection CREATED. Length: " + String.format("%.0f", requiredLength));
                     }
-                } else {
-                    System.out.println("GC.Wire: FAILED - Not enough wire. Required: " + String.format("%.0f", requiredLength));
                 }
-            } else {
-                String reason = (targetPort == null) ? "No target port." : (!isValidConnectionAttempt(wiringStartPort, targetPort)) ? "Invalid attempt." : "Target already connected.";
-                System.out.println("GC.Wire: FAILED - " + reason);
             }
+
+            gameView.redrawAll(gameState);
+            checkAndSetAllPortsConnected();
         }
+
+        else if (isDraggingBendPoint) {
+            System.out.println("Finished dragging bend point.");
+        }
+
 
         isWiring = false;
         wiringStartPort = null;
         if (tempWire != null) {
-            if (gameView != null) gameView.removeNode(tempWire);
+            gameView.removeNode(tempWire);
             tempWire = null;
         }
 
-        if (gameState != null) {
-            for (SystemNode system : gameState.getSystems()) {
-                system.updateAllPortsActuallyConnectedState();
-            }
-        }
-
-        if (gameView != null && gameState != null) {
-            gameView.redrawAll(gameState);
-            checkAndSetAllPortsConnected();
-        }
+        isDraggingBendPoint = false;
+        activeConnection = null;
+        activeBendPointIndex = -1;
     }
 
     private void checkAndSetAllPortsConnected() {
@@ -456,6 +501,31 @@ public class GameController {
             return false;
         }
         return true;
+    }
+
+    private Connection findClickedConnection(double clickX, double clickY) {
+        if (gameState == null) return null;
+        final double clickThreshold = 5.0;
+
+        for (Connection conn : gameState.getConnections()) {
+            List<Point2D> path = conn.getFullPath();
+            for (int i = 0; i < path.size() - 1; i++) {
+                Point2D p1 = path.get(i);
+                Point2D p2 = path.get(i + 1);
+
+
+                double left = Math.min(p1.getX(), p2.getX()) - clickThreshold;
+                double right = Math.max(p1.getX(), p2.getX()) + clickThreshold;
+                double top = Math.min(p1.getY(), p2.getY()) - clickThreshold;
+                double bottom = Math.max(p1.getY(), p2.getY()) + clickThreshold;
+
+                if (clickX >= left && clickX <= right && clickY >= top && clickY <= bottom) {
+
+                    return conn;
+                }
+            }
+        }
+        return null;
     }
 
     public void pauseGameLogic() {

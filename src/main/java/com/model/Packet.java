@@ -7,6 +7,7 @@ import javafx.geometry.Point2D;
 import java.util.UUID;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.List;
 
 
 public class Packet {
@@ -23,15 +24,16 @@ public class Packet {
     private transient Node visualNode;
     private final int initialSize;
     private int currentSize;
-    private transient Label sizeLabel;
+    private final transient Label sizeLabel;
     private double noiseLevel;
     private double stabilityOnWire;
     private boolean isOffWire;
     private final String id;
-    private Map<String, Double> collisionCooldownWithPackets;
+    private final Map<String, Double> collisionCooldownWithPackets;
     private double currentMaxSpeedOnWire;
     private double inheritedStabilityDamage = 0.0;
     private double timeSpentIdleOffWireSeconds = 0.0;
+    private int currentSegmentIndex;
 
     public Packet(PacketType type, double initialX, double initialY) {
         this.id = UUID.randomUUID().toString();
@@ -74,6 +76,7 @@ public class Packet {
             this.velocity.set(Config.INITIAL_OFF_WIRE_VELOCITY_X, Config.INITIAL_OFF_WIRE_VELOCITY_Y);
             return;
         }
+
         this.currentConnection = connection;
         this.startPort = connection.getStartPort();
         this.targetPort = connection.getEndPort();
@@ -83,9 +86,19 @@ public class Packet {
         this.timeSpentIdleOffWireSeconds = 0.0;
         this.stabilityOnWire = 1.0 - this.inheritedStabilityDamage;
         this.inheritedStabilityDamage = 0.0;
+        this.currentSegmentIndex = 0;
 
-        this.setX(startPort.getAbsoluteX());
-        this.setY(startPort.getAbsoluteY());
+        List<Point2D> path = connection.getFullPath();
+        if (path.size() < 2) {
+
+            this.isOffWire = true;
+            return;
+        }
+        Point2D startPoint = path.get(0);
+        Point2D nextPoint = path.get(1);
+
+        this.setX(startPoint.getX());
+        this.setY(startPoint.getY());
 
         boolean compatibleStart = (this.type == startPort.getPacketType());
         double initialSpeedFactorToUse = 1.0;
@@ -111,8 +124,8 @@ public class Packet {
         }
 
         Vector2D direction = Vector2D.direction(
-                new Vector2D(startPort.getAbsoluteX(), startPort.getAbsoluteY()),
-                new Vector2D(targetPort.getAbsoluteX(), targetPort.getAbsoluteY())
+                new Vector2D(startPoint.getX(), startPoint.getY()),
+                new Vector2D(nextPoint.getX(), nextPoint.getY())
         );
         if (direction.magnitudeSquared() < 0.0001) {
             direction = new Vector2D(1, 0);
@@ -141,90 +154,67 @@ public class Packet {
             return false;
         }
 
-        if (currentConnection == null || targetPort == null || startPort == null) {
+
+        if (currentConnection == null) {
             isOffWire = true;
-            timeSpentIdleOffWireSeconds = 0.0;
             return false;
+        }
+
+        List<Point2D> path = currentConnection.getFullPath();
+
+
+        if (currentSegmentIndex >= path.size() - 1) {
+            return true;
+        }
+
+
+        Point2D currentTargetPoint = path.get(currentSegmentIndex + 1);
+        Vector2D packetPos = new Vector2D(this.x, this.y);
+        Vector2D targetPos = new Vector2D(currentTargetPoint.getX(), currentTargetPoint.getY());
+
+        double distanceToTarget = packetPos.distance(targetPos);
+        double travelDistanceThisFrame = velocity.magnitude() * deltaTime;
+
+
+        if (distanceToTarget <= travelDistanceThisFrame * 1.05) {
+
+            this.setX(targetPos.getX());
+            this.setY(targetPos.getY());
+
+            currentSegmentIndex++;
+
+            if (currentSegmentIndex >= path.size() - 1) {
+                this.velocity.set(0, 0);
+                this.acceleration = 0;
+                return true;
+            } else {
+                Point2D nextTargetPoint = path.get(currentSegmentIndex + 1);
+                Vector2D newDirection = Vector2D.direction(
+                        new Vector2D(this.x, this.y),
+                        new Vector2D(nextTargetPoint.getX(), nextTargetPoint.getY())
+                );
+
+
+                double currentSpeed = this.velocity.magnitude();
+                this.velocity.set(Vector2D.multiply(newDirection, currentSpeed));
+            }
         }
 
         if (this.type == PacketType.TRIANGLE && this.acceleration > 0 && stabilityOnWire > Config.MIN_STABILITY_FOR_ACCELERATION) {
             if (velocity.magnitude() < this.currentMaxSpeedOnWire) {
-                Vector2D directionToTarget = Vector2D.direction(new Vector2D(x, y), new Vector2D(targetPort.getAbsoluteX(), targetPort.getAbsoluteY())).normalize();
-                if (directionToTarget.magnitudeSquared() < 0.0001 && velocity.magnitudeSquared() > 0.0001) directionToTarget = Vector2D.normalized(velocity);
-                if (directionToTarget.magnitudeSquared() < 0.0001) directionToTarget = new Vector2D(1,0);
-
-                Vector2D accelerationVector = Vector2D.multiply(directionToTarget, this.acceleration * deltaTime);
-                if (Vector2D.add(this.velocity, accelerationVector).magnitudeSquared() <= this.currentMaxSpeedOnWire * this.currentMaxSpeedOnWire) {
-                    this.velocity.add(accelerationVector);
-                } else {
-                    this.velocity.set(Vector2D.multiply(directionToTarget, this.currentMaxSpeedOnWire));
+                Vector2D accelVec = new Vector2D(this.velocity).normalize().multiply(this.acceleration * deltaTime);
+                this.velocity.add(accelVec);
+                if (this.velocity.magnitudeSquared() > this.currentMaxSpeedOnWire * this.currentMaxSpeedOnWire) {
+                    this.velocity.normalize().multiply(this.currentMaxSpeedOnWire);
                 }
             }
         }
 
-        Vector2D packetPosVec = new Vector2D(this.x, this.y);
-        Point2D p1_javafx = new Point2D(startPort.getAbsoluteX(), startPort.getAbsoluteY());
-        Point2D p2_javafx = new Point2D(targetPort.getAbsoluteX(), targetPort.getAbsoluteY());
-        double distanceFromWire;
-        double segmentDx = p2_javafx.getX() - p1_javafx.getX();
-        double segmentDy = p2_javafx.getY() - p1_javafx.getY();
-        double lineSegmentLengthSq = segmentDx * segmentDx + segmentDy * segmentDy;
-        Vector2D closestPointOnWireSegment;
-
-        if (lineSegmentLengthSq < 0.0001) {
-            closestPointOnWireSegment = new Vector2D(p1_javafx.getX(), p1_javafx.getY());
-        } else {
-            double t = ((packetPosVec.getX() - p1_javafx.getX()) * segmentDx + (packetPosVec.getY() - p1_javafx.getY()) * segmentDy) / lineSegmentLengthSq;
-            t = Math.max(0, Math.min(1, t));
-            closestPointOnWireSegment = new Vector2D(p1_javafx.getX() + t * segmentDx, p1_javafx.getY() + t * segmentDy);
-        }
-        distanceFromWire = packetPosVec.distance(closestPointOnWireSegment);
-
-        if (distanceFromWire > Config.MIN_DEVIATION_FOR_RETURN_FORCE && stabilityOnWire > Config.MIN_STABILITY_FOR_RETURN_FORCE) {
-            Vector2D forceToWireDir = Vector2D.subtract(closestPointOnWireSegment, packetPosVec).normalize();
-            if (forceToWireDir.magnitudeSquared() > 0.0001) {
-                double returnForceMag = Math.min(distanceFromWire * Config.WIRE_RETURN_FORCE_STRENGTH, Config.MAX_WIRE_RETURN_FORCE);
-                this.velocity.add(Vector2D.multiply(forceToWireDir, returnForceMag * stabilityOnWire * deltaTime));
-            }
-        }
 
         this.x += velocity.getX() * deltaTime;
         this.y += velocity.getY() * deltaTime;
         updateLabelPosition();
 
-
-        double totalWireLength = currentConnection.getLength();
-        Vector2D currentPosVec = new Vector2D(this.x, this.y);
-        Vector2D targetPosVec = new Vector2D(targetPort.getAbsoluteX(), targetPort.getAbsoluteY());
-
-        if (totalWireLength < Config.MIN_WIRE_LENGTH_FOR_PROGRESS_CALC || currentPosVec.distance(targetPosVec) < Config.ARRIVAL_DISTANCE_THRESHOLD) {
-            this.setX(targetPort.getAbsoluteX());
-            this.setY(targetPort.getAbsoluteY());
-            this.velocity.set(0, 0);
-            this.acceleration = 0;
-            return true;
-        }
-
-        Vector2D wireDir = Vector2D.direction(new Vector2D(startPort.getAbsoluteX(), startPort.getAbsoluteY()), targetPosVec);
-        if(wireDir.magnitudeSquared() < 0.0001) wireDir = new Vector2D(1,0);
-        double speedAlong = velocity.dot(wireDir);
-        if (speedAlong > 0) {
-            progressOnConnection += (speedAlong * deltaTime) / totalWireLength;
-        }
-        progressOnConnection = Math.max(0, Math.min(1.0, progressOnConnection));
-
-        if (stabilityOnWire < Config.MIN_STABILITY_TO_STAY_ON_WIRE || distanceFromWire > Config.DEVIATION_THRESHOLD_FOR_OFF_WIRE) {
-            isOffWire = true;
-            timeSpentIdleOffWireSeconds = 0.0;
-        }
-
-        if (progressOnConnection >= Config.ARRIVAL_PROGRESS_THRESHOLD) {
-            this.setX(targetPort.getAbsoluteX());
-            this.setY(targetPort.getAbsoluteY());
-            this.velocity.set(0, 0);
-            this.acceleration = 0;
-            return true;
-        }
 
         return false;
     }

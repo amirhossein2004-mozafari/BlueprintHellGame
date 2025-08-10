@@ -61,7 +61,10 @@ public class SystemNode {
             case SINK:
                 createSpecificPorts(1, 2, 0, 0);
                 break;
-            case INTERMEDIATE:
+            case VPN:
+                createSpecificPorts(1, 1, 1, 1);
+                break;
+                case INTERMEDIATE:
             default:
                 createSpecificPorts(1, 1, 1, 1);
                 break;
@@ -141,6 +144,27 @@ public class SystemNode {
     public void receivePacket(Packet packet, GameState gameState) {
         if (packet == null || gameState == null) return;
 
+        if (this.role == SystemRole.VPN) {
+
+            Connection outputConnection = findCompatibleFreeOutputConnection(this, gameState, packet.getType());
+            if (outputConnection == null) {
+                outputConnection = findAnyFreeOutputConnection(this, gameState);
+            }
+
+            if (outputConnection != null) {
+                System.out.println("VPN System: Transforming packet to PROTECTED and forwarding.");
+                Packet protectedPacket = new Packet(PacketType.PROTECTED, packet.getX(), packet.getY());
+                protectedPacket.startMoving(outputConnection);
+                gameState.addPacket(protectedPacket);
+                gameState.removePacket(packet);
+            } else {
+                System.out.println("VPN System: No free output, packet is lost.");
+                gameState.registerCompletelyLostPacket(packet);
+                gameState.removePacket(packet);
+            }
+            return;
+        }
+
         boolean canAcceptPacket = (this.role == SystemRole.SINK) || (storedPackets.size() < Config.SYSTEM_PACKET_STORAGE_CAPACITY);
 
         if (canAcceptPacket) {
@@ -167,6 +191,8 @@ public class SystemNode {
             gameState.registerCompletelyLostPacket(packet);
         }
     }
+
+
     public void update(double deltaTime, GameState gameState) {
         if (gameState == null || role == SystemRole.SINK || role == SystemRole.SOURCE || storedPackets.isEmpty()) {
             return;
@@ -182,7 +208,12 @@ public class SystemNode {
             if (candidatePacket == null) continue;
 
 
-            Connection availableConnection = findAnyFreeOutputConnection(this, gameState);
+            Connection availableConnection = findCompatibleFreeOutputConnection(this, gameState, candidatePacket.getType());
+
+            if (availableConnection == null && this.role == SystemRole.INTERMEDIATE) {
+                availableConnection = findAnyFreeOutputConnection(this, gameState);
+            }
+
             if (availableConnection != null) {
                 packetToSend = candidatePacket;
                 connToSendOn = availableConnection;
@@ -221,6 +252,8 @@ public class SystemNode {
         return null;
     }
 
+
+
     private Connection findAnyFreeOutputConnection(SystemNode system, GameState state) {
         if (system == null || state == null) return null;
         List<Connection> freeConnections = new ArrayList<>();
@@ -228,20 +261,37 @@ public class SystemNode {
         for (Port port : system.getOutputPorts()) {
             if (port.isConnected()) {
                 Connection conn = port.getConnectedConnection();
-                if (conn != null) {
-                    boolean occupied = isConnectionOccupied(conn, state);
-                    if (!occupied) {
-                        freeConnections.add(conn);
-                    }
-                } else {
+                if (conn != null && !isConnectionOccupied(conn, state)) {
+                    freeConnections.add(conn);
                 }
             }
         }
 
         if (!freeConnections.isEmpty()) {
-            Connection chosen = freeConnections.get(random.nextInt(freeConnections.size()));
-            return chosen;
+            return freeConnections.get(random.nextInt(freeConnections.size()));
         }
+        return null;
+    }
+
+    private Connection findCompatibleFreeOutputConnection(SystemNode system, GameState state, PacketType packetType) {
+        if (system == null || state == null || packetType == null) return null;
+        List<Connection> freeCompatibleConnections = new ArrayList<>();
+
+        for (Port port : system.getOutputPorts()) {
+
+            if (port.getPacketType() == packetType && port.isConnected()) {
+                Connection conn = port.getConnectedConnection();
+                if (conn != null && !isConnectionOccupied(conn, state)) {
+                    freeCompatibleConnections.add(conn);
+                }
+            }
+        }
+
+        if (!freeCompatibleConnections.isEmpty()) {
+            return freeCompatibleConnections.get(random.nextInt(freeCompatibleConnections.size()));
+        }
+
+
         return null;
     }
 

@@ -42,6 +42,9 @@ public class LevelSelectionView extends VBox {
         level2Button.setOnAction(e -> mainApp.startGame(2));
         levelsGrid.add(level2Button, 1, 0);
 
+        Button level3Button = createLevelButton("مرحله ۳ (تست)");
+        level3Button.setOnAction(e -> mainApp.startGame(3));
+        levelsGrid.add(level3Button, 0, 1);
 
         Button backButton = new Button("بازگشت به منوی اصلی");
         backButton.setPrefWidth(250);
