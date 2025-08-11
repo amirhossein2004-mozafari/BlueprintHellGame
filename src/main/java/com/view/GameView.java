@@ -70,6 +70,30 @@ public class GameView extends Pane {
 
     private void drawSingleSystem(SystemNode system) {
         Rectangle systemBody = new Rectangle(system.getX(), system.getY(), system.getWidth(), system.getHeight());
+<<<<<<< Updated upstream
+=======
+
+        if (system.getRole() == SystemRole.VPN) {
+            systemBody.setFill(Color.STEELBLUE);
+        } else if (system.getRole() == SystemRole.SABOTEUR) {
+            systemBody.setFill(Color.rgb(139, 0, 0));
+        }
+        else if (system.getRole() == SystemRole.SPY) {
+            systemBody.setFill(Color.rgb(112, 128, 144));
+        }
+        else if (system.getRole() == SystemRole.ANTI_TROJAN) {
+            systemBody.setFill(Color.rgb(60, 179, 113));
+        }
+        else if (system.getRole() == SystemRole.DISTRIBUTE) {
+            systemBody.setFill(Color.ORANGE);
+        } else if (system.getRole() == SystemRole.MERGE) {
+            systemBody.setFill(Color.DARKORANGE);
+        }
+        else {
+            systemBody.setFill(Config.COLOR_SYSTEM_RECT);
+        }
+
+>>>>>>> Stashed changes
         systemBody.setFill(Config.COLOR_SYSTEM_RECT);
         systemBody.setStroke(Color.BLACK);
         systemBody.setStrokeWidth(1);
@@ -212,6 +236,41 @@ public class GameView extends Pane {
             poly.getPoints().addAll( x, y - height * (2.0/3.0), x - size / 2.0, y + height * (1.0/3.0), x + size / 2.0, y + height * (1.0/3.0) );
             poly.setFill(Config.COLOR_PACKET_TRIANGLE);
             node = poly;
+<<<<<<< Updated upstream
+=======
+        }  else if (packet.getType() == PacketType.PROTECTED) {
+            size = 8;
+            node = new Circle(x, y, size / 2.0);
+            node.setFill(Color.DODGERBLUE);
+            node.setStroke(Color.WHITE);
+            node.setStrokeWidth(1.5);
+        }  else if (packet.getType() == PacketType.TROJAN) {
+            size = 9;
+            node = new Circle(x, y, size / 2.0);
+            node.setFill(Color.CRIMSON);
+            node.setStroke(Color.WHITE);
+            node.setStrokeWidth(1.0);
+        }  else if (packet.getType() == PacketType.MESSENGER_INFINITY) {
+
+            size = 10;
+            Rectangle rect1 = new Rectangle(x - size / 2, y - size / 6, size, size / 3);
+            Rectangle rect2 = new Rectangle(x - size / 6, y - size / 2, size / 3, size);
+            node = Shape.union(rect1, rect2);
+            node.setFill(Color.LIGHTCORAL);
+            node.setStroke(Color.WHITE);
+        }  else if (packet.getType() == PacketType.LARGE) {
+            size = 12;
+            node = new Rectangle(x - size/2, y - size/2, size, size);
+            ((Rectangle) node).setArcWidth(4);
+            ((Rectangle) node).setArcHeight(4);
+            node.setFill(Color.MAGENTA);
+            node.setStroke(Color.WHITE);
+        } else if (packet.getType() == PacketType.BIT_PACKET) {
+            size = 5;
+            node = new Circle(x, y, size/2.0);
+            node.setFill(Color.YELLOW);
+            node.setStroke(Color.GRAY);
+>>>>>>> Stashed changes
         }
 
         if(node instanceof Shape) { ((Shape)node).setStroke(Color.DARKSLATEGRAY); ((Shape)node).setStrokeWidth(0.5); }

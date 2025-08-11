@@ -75,6 +75,7 @@ public class GameController {
 
         handlePacketMovementAndArrival(scaledDeltaTime);
         updateSystemLogic(scaledDeltaTime);
+        updateAntiTrojanSystems(scaledDeltaTime);
 
         if (gameView != null) {
             gameView.updatePacketPositions(gameState);
@@ -458,6 +459,43 @@ public class GameController {
         return true;
     }
 
+<<<<<<< Updated upstream
+=======
+    private Connection findClickedConnection(double clickX, double clickY) {
+        if (gameState == null) return null;
+        final double clickThreshold = 5.0;
+
+        for (Connection conn : gameState.getConnections()) {
+            List<Point2D> path = conn.getFullPath();
+            for (int i = 0; i < path.size() - 1; i++) {
+                Point2D p1 = path.get(i);
+                Point2D p2 = path.get(i + 1);
+
+
+                double left = Math.min(p1.getX(), p2.getX()) - clickThreshold;
+                double right = Math.max(p1.getX(), p2.getX()) + clickThreshold;
+                double top = Math.min(p1.getY(), p2.getY()) - clickThreshold;
+                double bottom = Math.max(p1.getY(), p2.getY()) + clickThreshold;
+
+                if (clickX >= left && clickX <= right && clickY >= top && clickY <= bottom) {
+
+                    return conn;
+                }
+            }
+        }
+        return null;
+    }
+
+
+    private void updateAntiTrojanSystems(double scaledDeltaTime) {
+        for (SystemNode system : gameState.getSystems()) {
+            if (system.getRole() == SystemRole.ANTI_TROJAN) {
+                system.performAntiTrojanScan(gameState, scaledDeltaTime);
+            }
+        }
+    }
+
+>>>>>>> Stashed changes
     public void pauseGameLogic() {
         if (gameState != null) gameState.setGameLogicPaused(true);
     }

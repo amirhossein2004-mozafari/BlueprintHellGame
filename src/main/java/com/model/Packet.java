@@ -32,6 +32,12 @@ public class Packet {
     private double currentMaxSpeedOnWire;
     private double inheritedStabilityDamage = 0.0;
     private double timeSpentIdleOffWireSeconds = 0.0;
+<<<<<<< Updated upstream
+=======
+    private int currentSegmentIndex;
+    private String parentLargePacketId = null;
+    private int totalBitsForParent = 0;
+>>>>>>> Stashed changes
 
     public Packet(PacketType type, double initialX, double initialY) {
         this.id = UUID.randomUUID().toString();
@@ -326,4 +332,19 @@ public class Packet {
         this.sizeLabel.setLayoutY(this.y + labelOffsetY);
     }
 
+    public int getTotalBitsForParent() {
+        return totalBitsForParent;
+    }
+
+    public void setTotalBitsForParent(int totalBitsForParent) {
+        this.totalBitsForParent = totalBitsForParent;
+    }
+
+    public String getParentLargePacketId() {
+        return parentLargePacketId;
+    }
+
+    public void setParentLargePacketId(String parentLargePacketId) {
+        this.parentLargePacketId = parentLargePacketId;
+    }
 }

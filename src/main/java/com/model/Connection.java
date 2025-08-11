@@ -8,7 +8,13 @@ public class Connection {
     private final String id;
     private final Port startPort;
     private final Port endPort;
+<<<<<<< Updated upstream
     private final double length;
+=======
+    private final List<Point2D> bendPoints;
+    private double length;
+    private int largePacketPassages = 0;
+>>>>>>> Stashed changes
 
     public Connection(Port startPort, Port endPort) {
         if (startPort == null || endPort == null) {
@@ -44,6 +50,30 @@ public class Connection {
         return length;
     }
 
+<<<<<<< Updated upstream
+=======
+    public void moveBendPoint(int index, Point2D newPosition) {
+        if (index >= 0 && index < bendPoints.size() && newPosition != null) {
+            this.bendPoints.set(index, newPosition);
+            recalculateLength();
+        }
+    }
+
+
+    public List<Point2D> getBendPoints() {
+        return Collections.unmodifiableList(bendPoints);
+    }
+
+    public void registerLargePacketPassage() {
+        this.largePacketPassages++;
+    }
+
+    public int getLargePacketPassages() {
+        return this.largePacketPassages;
+    }
+
+
+>>>>>>> Stashed changes
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
