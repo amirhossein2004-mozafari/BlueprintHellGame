@@ -70,8 +70,7 @@ public class GameView extends Pane {
 
     private void drawSingleSystem(SystemNode system) {
         Rectangle systemBody = new Rectangle(system.getX(), system.getY(), system.getWidth(), system.getHeight());
-<<<<<<< Updated upstream
-=======
+
 
         if (system.getRole() == SystemRole.VPN) {
             systemBody.setFill(Color.STEELBLUE);
@@ -93,7 +92,7 @@ public class GameView extends Pane {
             systemBody.setFill(Config.COLOR_SYSTEM_RECT);
         }
 
->>>>>>> Stashed changes
+
         systemBody.setFill(Config.COLOR_SYSTEM_RECT);
         systemBody.setStroke(Color.BLACK);
         systemBody.setStrokeWidth(1);
@@ -222,58 +221,55 @@ public class GameView extends Pane {
         double size;
         double x = packet.getX();
         double y = packet.getY();
-        Node node = null;
+        Shape node;
 
         if (packet.getType() == PacketType.SQUARE) {
             size = Config.PORT_VISUAL_SIZE_SQUARE * 2;
-            Rectangle rect = new Rectangle(x - size / 2.0, y - size / 2.0, size, size);
-            rect.setFill(Config.COLOR_PACKET_SQUARE);
-            node = rect;
+            node = new Rectangle(x - size / 2.0, y - size / 2.0, size, size);
+            node.setFill(Config.COLOR_PACKET_SQUARE);
         } else if (packet.getType() == PacketType.TRIANGLE) {
             size = Config.PORT_VISUAL_SIZE_TRIANGLE * 1.8;
             Polygon poly = new Polygon();
             double height = size * Math.sqrt(3) / 2.0;
-            poly.getPoints().addAll( x, y - height * (2.0/3.0), x - size / 2.0, y + height * (1.0/3.0), x + size / 2.0, y + height * (1.0/3.0) );
-            poly.setFill(Config.COLOR_PACKET_TRIANGLE);
+            poly.getPoints().addAll(x, y - height * (2.0/3.0), x - size / 2.0, y + height * (1.0/3.0), x + size / 2.0, y + height * (1.0/3.0));
             node = poly;
-<<<<<<< Updated upstream
-=======
-        }  else if (packet.getType() == PacketType.PROTECTED) {
+            node.setFill(Config.COLOR_PACKET_TRIANGLE);
+        } else if (packet.getType() == PacketType.PROTECTED) {
             size = 8;
             node = new Circle(x, y, size / 2.0);
             node.setFill(Color.DODGERBLUE);
             node.setStroke(Color.WHITE);
             node.setStrokeWidth(1.5);
-        }  else if (packet.getType() == PacketType.TROJAN) {
+        } else if (packet.getType() == PacketType.TROJAN) {
             size = 9;
             node = new Circle(x, y, size / 2.0);
             node.setFill(Color.CRIMSON);
             node.setStroke(Color.WHITE);
-            node.setStrokeWidth(1.0);
-        }  else if (packet.getType() == PacketType.MESSENGER_INFINITY) {
-
+        } else if (packet.getType() == PacketType.MESSENGER_INFINITY) {
             size = 10;
             Rectangle rect1 = new Rectangle(x - size / 2, y - size / 6, size, size / 3);
             Rectangle rect2 = new Rectangle(x - size / 6, y - size / 2, size / 3, size);
             node = Shape.union(rect1, rect2);
             node.setFill(Color.LIGHTCORAL);
             node.setStroke(Color.WHITE);
-        }  else if (packet.getType() == PacketType.LARGE) {
+        } else if (packet.getType() == PacketType.LARGE) {
             size = 12;
-            node = new Rectangle(x - size/2, y - size/2, size, size);
-            ((Rectangle) node).setArcWidth(4);
-            ((Rectangle) node).setArcHeight(4);
+            Rectangle rect = new Rectangle(x - size/2, y - size/2, size, size);
+            rect.setArcWidth(4); rect.setArcHeight(4);
+            node = rect;
             node.setFill(Color.MAGENTA);
-            node.setStroke(Color.WHITE);
         } else if (packet.getType() == PacketType.BIT_PACKET) {
             size = 5;
             node = new Circle(x, y, size/2.0);
             node.setFill(Color.YELLOW);
-            node.setStroke(Color.GRAY);
->>>>>>> Stashed changes
+        } else {
+
+            node = new Circle(x,y,5);
+            node.setFill(Color.WHITE);
         }
 
-        if(node instanceof Shape) { ((Shape)node).setStroke(Color.DARKSLATEGRAY); ((Shape)node).setStrokeWidth(0.5); }
+        if (node.getStroke() == null) node.setStroke(Color.DARKSLATEGRAY);
+        if (node.getStrokeWidth() == 0) node.setStrokeWidth(0.5);
         return node;
     }
 

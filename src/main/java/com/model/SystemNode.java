@@ -2,13 +2,9 @@ package com.model;
 
 import com.blueprinthell.Config;
 import javafx.geometry.Point2D;
+import org.json.JSONObject;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Random;
-
+import java.util.*;
 
 
 public class SystemNode {
@@ -24,11 +20,11 @@ public class SystemNode {
     private boolean indicatorOn = false;
     private static final Random random = new Random();
     private boolean allPortsActuallyConnected = false;
+
     private double antiTrojanCooldown = 0.0;
-    private boolean isActive = true;
-    private double cooldownTimer = 0.0;
     private static final double ANTI_TROJAN_RADIUS = 150.0;
     private static final double ANTI_TROJAN_COOLDOWN_SECONDS = 10.0;
+    private final Map<String, List<Packet>> receivedBitPackets = new HashMap<>();
 
     public SystemNode(double x, double y, SystemRole role,
                       int numSquareInputs, int numTriangleInputs,
@@ -60,26 +56,29 @@ public class SystemNode {
 
         switch (role) {
             case SOURCE:
-                createSpecificPorts(0, 0, 2, 1);
+                createSpecificPorts(0, 0, 1, 1);
                 break;
             case SINK:
-                createSpecificPorts(1, 2, 0, 0);
+                createSpecificPorts(1, 1, 0, 0);
                 break;
-<<<<<<< Updated upstream
-            case INTERMEDIATE:
-=======
             case VPN:
+            case SABOTEUR:
+            case SPY:
                 createSpecificPorts(1, 1, 1, 1);
                 break;
             case ANTI_TROJAN:
-                createSpecificPorts(0, 0, 0, 0);
+                createSpecificPorts(0,0,0,0);
                 break;
-                case INTERMEDIATE:
->>>>>>> Stashed changes
+            case DISTRIBUTE:
+            case MERGE:
+                createSpecificPorts(2, 2, 2, 2);
+                break;
+            case INTERMEDIATE:
             default:
                 createSpecificPorts(1, 1, 1, 1);
                 break;
         }
+        validatePortsBasedOnRole();
     }
 
     public void updateAllPortsActuallyConnectedState() {
@@ -152,14 +151,17 @@ public class SystemNode {
         }
     }
 
+
+
     public void receivePacket(Packet packet, GameState gameState) {
-        if (packet == null || gameState == null) return;
+        if (packet == null || gameState == null) {
+            return;
+        }
 
-<<<<<<< Updated upstream
-=======
+
         if (this.role == SystemRole.VPN) {
-
             Connection outputConnection = findCompatibleFreeOutputConnection(this, gameState, packet.getType());
+
             if (outputConnection == null) {
                 outputConnection = findAnyFreeOutputConnection(this, gameState);
             }
@@ -167,18 +169,86 @@ public class SystemNode {
             if (outputConnection != null) {
                 System.out.println("VPN System: Transforming packet to PROTECTED and forwarding.");
                 Packet protectedPacket = new Packet(PacketType.PROTECTED, packet.getX(), packet.getY());
+
+
+                protectedPacket.setVelocity(packet.getVelocity());
+
                 protectedPacket.startMoving(outputConnection);
                 gameState.addPacket(protectedPacket);
-                gameState.removePacket(packet);
             } else {
+
                 System.out.println("VPN System: No free output, packet is lost.");
                 gameState.registerCompletelyLostPacket(packet);
-                gameState.removePacket(packet);
             }
+
+            gameState.removePacket(packet);
             return;
         }
+
+        if (this.role == SystemRole.DISTRIBUTE) {
+
+            if (packet.getType() == PacketType.LARGE) {
+                System.out.println("Distribute system received a LARGE packet, size: " + packet.getCurrentSize());
+
+                final int numberOfBits = packet.getCurrentSize();
+                final String parentId = packet.getId();
+
+                for (int i = 0; i < numberOfBits; i++) {
+                    Connection outputConn = findAnyFreeOutputConnection(this, gameState);
+                    if (outputConn != null) {
+                        Packet bitPacket = new Packet(PacketType.BIT_PACKET, this.getX(), this.getY());
+
+
+                        bitPacket.setParentLargePacketId(parentId);
+                        bitPacket.setTotalBitsForParent(numberOfBits);
+
+                        bitPacket.startMoving(outputConn);
+                        gameState.addPacket(bitPacket);
+                    }
+                }
+                System.out.println("Distribute system spawned " + numberOfBits + " bit-packets.");
+
+            } else {
+
+                storedPackets.add(packet);
+            }
+
+            gameState.removePacket(packet);
+            return;
+        }
+
+        if (this.role == SystemRole.MERGE) {
+            if (packet.getType() == PacketType.BIT_PACKET) {
+                String parentId = packet.getParentLargePacketId();
+                if (parentId != null) {
+                    List<Packet> bitsForParent = receivedBitPackets.computeIfAbsent(parentId, k -> new ArrayList<>());
+                    bitsForParent.add(packet);
+
+                    System.out.println("Merge system received bit-packet for parent " + parentId +
+                            ". Total received: " + bitsForParent.size() + "/" + packet.getTotalBitsForParent());
+
+                    if (bitsForParent.size() == packet.getTotalBitsForParent()) {
+                        System.out.println("All bits for " + parentId + " collected! Reconstructing LARGE packet.");
+
+                        Packet reconstructedLargePacket = new Packet(PacketType.LARGE, this.x, this.y);
+                        reconstructedLargePacket.setCurrentSize(bitsForParent.size());
+
+                        for (Packet bit : bitsForParent) {
+                            gameState.removePacket(bit);
+                        }
+                        receivedBitPackets.remove(parentId);
+                        storedPackets.add(reconstructedLargePacket);
+                    }
+                }
+            } else {
+                storedPackets.add(packet);
+            }
+            gameState.removePacket(packet);
+            return;
+        }
+
+
         if (this.role == SystemRole.SABOTEUR) {
-            System.out.println("Saboteur System received packet: " + packet.getType());
 
             if (packet.getNoiseLevel() == 0.0) {
                 packet.addNoise(0.1);
@@ -194,66 +264,29 @@ public class SystemNode {
             }
         }
 
-        if (this.role == SystemRole.DISTRIBUTE) {
-            if (packet.getType() == PacketType.LARGE) {
-                System.out.println("Distribute system received a LARGE packet.");
-
-                int numberOfBits = packet.getCurrentSize();
-                String parentId = packet.getId();
-
-                for (int i = 0; i < numberOfBits; i++) {
-                    Connection outputConn = findAnyFreeOutputConnection(this, gameState);
-                    if (outputConn != null) {
-                        Packet bitPacket = new Packet(PacketType.BIT_PACKET, this.getX(), this.getY());
-
-                        bitPacket.setParentLargePacketId(parentId);
-                        bitPacket.setTotalBitsForParent(numberOfBits);
-
-                        bitPacket.startMoving(outputConn);
-                        gameState.addPacket(bitPacket);
-                    }
-                }
-
-                gameState.removePacket(packet);
-                System.out.println("Spawned " + numberOfBits + " bit-packets.");
-
-            } else {
-
-                storedPackets.add(packet);
-                gameState.removePacket(packet);
-            }
-            return;
-        }
-
->>>>>>> Stashed changes
         boolean canAcceptPacket = (this.role == SystemRole.SINK) || (storedPackets.size() < Config.SYSTEM_PACKET_STORAGE_CAPACITY);
 
         if (canAcceptPacket) {
-            int coinsToAdd = (packet.getType() == PacketType.SQUARE) ? Config.COINS_PER_SQUARE_PACKET_SYSTEM_ENTRY : Config.COINS_PER_TRIANGLE_PACKET_SYSTEM_ENTRY;
+            int coinsToAdd = (packet.getType() == PacketType.SQUARE) ?
+                    Config.COINS_PER_SQUARE_PACKET_SYSTEM_ENTRY :
+                    Config.COINS_PER_TRIANGLE_PACKET_SYSTEM_ENTRY;
             gameState.addCoin(coinsToAdd);
 
             if (this.role != SystemRole.SINK) {
                 packet.setInheritedStabilityDamage(1.0 - packet.getStabilityOnWire());
                 packet.getVelocity().set(0,0);
-                packet.setAcceleration(0);
                 packet.setCurrentConnection(null);
-                packet.setTargetPort(null);
-                packet.setStartPort(null);
-                packet.setProgressOnConnection(0);
                 storedPackets.add(packet);
-            } else {
-                packet.setCurrentConnection(null);
-                packet.setTargetPort(null);
-                packet.setStartPort(null);
-                packet.setProgressOnConnection(1.0);
-
             }
         } else {
             gameState.registerCompletelyLostPacket(packet);
         }
+
+        gameState.removePacket(packet);
     }
+
     public void update(double deltaTime, GameState gameState) {
-        if (gameState == null || role == SystemRole.SINK || role == SystemRole.SOURCE || storedPackets.isEmpty()) {
+        if (gameState == null || storedPackets.isEmpty()) {
             return;
         }
 
@@ -263,48 +296,26 @@ public class SystemNode {
 
         for (int i = 0; i < storedPackets.size(); i++) {
             Packet candidatePacket = storedPackets.get(i);
-            if (candidatePacket == null) continue;
+            Connection availableConnection;
 
-            Connection availableConnection = null;
-
-
-<<<<<<< Updated upstream
-            Connection availableConnection = findAnyFreeOutputConnection(this, gameState);
-=======
             if (this.role == SystemRole.SPY) {
-
                 List<SystemNode> allSpySystems = new ArrayList<>();
-                for(SystemNode sys : gameState.getSystems()){
-                    if(sys.getRole() == SystemRole.SPY){
-                        allSpySystems.add(sys);
-                    }
-                }
-
+                gameState.getSystems().stream().filter(s -> s.getRole() == SystemRole.SPY).forEach(allSpySystems::add);
                 Collections.shuffle(allSpySystems);
 
+                availableConnection = null;
                 for (SystemNode spySystem : allSpySystems) {
                     availableConnection = findCompatibleFreeOutputConnection(spySystem, gameState, candidatePacket.getType());
-                    if (availableConnection != null) {
-                        break;
-                    }
+                    if (availableConnection != null) break;
                 }
-            }
-
-            else if (this.role == SystemRole.SABOTEUR) {
+            } else if (this.role == SystemRole.SABOTEUR) {
                 availableConnection = findIncompatibleFreeOutputConnection(this, gameState, candidatePacket.getType());
-                if (availableConnection == null) {
-                    availableConnection = findAnyFreeOutputConnection(this, gameState);
-                }
-            }
-
-            else {
+                if (availableConnection == null) availableConnection = findAnyFreeOutputConnection(this, gameState);
+            } else {
                 availableConnection = findCompatibleFreeOutputConnection(this, gameState, candidatePacket.getType());
-                if (availableConnection == null && this.role == SystemRole.INTERMEDIATE) {
-                    availableConnection = findAnyFreeOutputConnection(this, gameState);
-                }
+                if (availableConnection == null) availableConnection = findAnyFreeOutputConnection(this, gameState);
             }
 
->>>>>>> Stashed changes
             if (availableConnection != null) {
                 packetToSend = candidatePacket;
                 connToSendOn = availableConnection;
@@ -313,26 +324,36 @@ public class SystemNode {
             }
         }
 
-        if (packetToSend != null && connToSendOn != null && packetIndexInQueue != -1) {
-
+        if (packetToSend != null) {
             if(this.role == SystemRole.SPY) {
                 Port exitPort = connToSendOn.getStartPort();
                 packetToSend.setX(exitPort.getAbsoluteX());
                 packetToSend.setY(exitPort.getAbsoluteY());
-                System.out.println("Teleporting packet " + packetToSend.getType() + " to new exit.");
             }
-
             storedPackets.remove(packetIndexInQueue);
             packetToSend.startMoving(connToSendOn);
             gameState.addPacket(packetToSend);
-
-            System.out.println("SystemNode " + (this.hashCode() % 1000) + " (Role: " + this.role +
-                    ") sent packet: " + packetToSend.getType() + " from System " +
-                    (connToSendOn.getStartPort().getParentSystem().hashCode() % 1000) +
-                    " via port of type: " + connToSendOn.getStartPort().getPacketType());
         }
     }
 
+    private Connection findCompatibleFreeOutputConnection(SystemNode system, GameState state, PacketType packetType) {
+        if (system == null || state == null || packetType == null) return null;
+        List<Connection> freeCompatibleConnections = new ArrayList<>();
+
+        for (Port port : system.getOutputPorts()) {
+            if (port.getPacketType() == packetType && port.isConnected()) {
+                Connection conn = port.getConnectedConnection();
+                if (conn != null && !isConnectionOccupied(conn, state)) {
+                    freeCompatibleConnections.add(conn);
+                }
+            }
+        }
+
+        if (!freeCompatibleConnections.isEmpty()) {
+            return freeCompatibleConnections.get(random.nextInt(freeCompatibleConnections.size()));
+        }
+        return null;
+    }
 
     private Connection findAnyAvailableConnectionFromSystem(SystemNode system, GameState state) {
         List<Connection> availableConnections = new ArrayList<>();
@@ -355,19 +376,14 @@ public class SystemNode {
         for (Port port : system.getOutputPorts()) {
             if (port.isConnected()) {
                 Connection conn = port.getConnectedConnection();
-                if (conn != null) {
-                    boolean occupied = isConnectionOccupied(conn, state);
-                    if (!occupied) {
-                        freeConnections.add(conn);
-                    }
-                } else {
+                if (conn != null && !isConnectionOccupied(conn, state)) {
+                    freeConnections.add(conn);
                 }
             }
         }
 
         if (!freeConnections.isEmpty()) {
-            Connection chosen = freeConnections.get(random.nextInt(freeConnections.size()));
-            return chosen;
+            return freeConnections.get(random.nextInt(freeConnections.size()));
         }
         return null;
     }
@@ -414,6 +430,7 @@ public class SystemNode {
     private Connection findIncompatibleFreeOutputConnection(SystemNode system, GameState state, PacketType packetType) {
         if (system == null || state == null || packetType == null) return null;
         List<Connection> freeIncompatibleConnections = new ArrayList<>();
+
         for (Port port : system.getOutputPorts()) {
             if (port.getPacketType() != packetType && port.isConnected()) {
                 Connection conn = port.getConnectedConnection();
@@ -422,6 +439,7 @@ public class SystemNode {
                 }
             }
         }
+
         if (!freeIncompatibleConnections.isEmpty()) {
             return freeIncompatibleConnections.get(random.nextInt(freeIncompatibleConnections.size()));
         }
@@ -430,39 +448,35 @@ public class SystemNode {
 
 
     public void performAntiTrojanScan(GameState gameState, double deltaTime) {
-
         if (antiTrojanCooldown > 0) {
             antiTrojanCooldown = Math.max(0, antiTrojanCooldown - deltaTime);
             return;
         }
-
-        Vector2D antiTrojanPos = new Vector2D(this.getX() + this.getWidth()/2, this.getY() + this.getHeight()/2);
-        Packet foundTrojan = null;
-
-        for (Packet packet : gameState.getPackets()) {
+        Vector2D antiTrojanPos = new Vector2D(this.x + this.width/2, this.y + this.height/2);
+        for (Packet packet : new ArrayList<>(gameState.getPackets())) {
             if (packet.getType() == PacketType.TROJAN) {
-                Vector2D packetPos = new Vector2D(packet.getX(), packet.getY());
-                if (antiTrojanPos.distance(packetPos) <= ANTI_TROJAN_RADIUS) {
-                    foundTrojan = packet;
-                    break;
+                if (antiTrojanPos.distance(new Vector2D(packet.getX(), packet.getY())) <= ANTI_TROJAN_RADIUS) {
+                    Packet messengerPacket = new Packet(PacketType.MESSENGER_INFINITY, packet.getX(), packet.getY());
+                    messengerPacket.setVelocity(packet.getVelocity());
+                    messengerPacket.setCurrentConnection(packet.getCurrentConnection());
+                    gameState.removePacket(packet);
+                    gameState.addPacket(messengerPacket);
+                    this.antiTrojanCooldown = ANTI_TROJAN_COOLDOWN_SECONDS;
+                    return;
                 }
             }
         }
-
-        if (foundTrojan != null) {
-            System.out.println("Anti-Trojan system found a trojan!");
-
-            Packet messengerPacket = new Packet(PacketType.MESSENGER_INFINITY, foundTrojan.getX(), foundTrojan.getY());
-            messengerPacket.setVelocity(foundTrojan.getVelocity());
-            messengerPacket.setCurrentConnection(foundTrojan.getCurrentConnection());
-
-            gameState.removePacket(foundTrojan);
-            gameState.addPacket(messengerPacket);
-
-            this.antiTrojanCooldown = ANTI_TROJAN_COOLDOWN_SECONDS;
-            System.out.println("Anti-Trojan is now on cooldown for " + ANTI_TROJAN_COOLDOWN_SECONDS + " seconds.");
-        }
     }
+
+    public JSONObject toJson() {
+        JSONObject json = new JSONObject();
+        json.put("x", this.x);
+        json.put("y", this.y);
+        json.put("role", this.role.toString());
+
+        return json;
+    }
+
 
     public double getX() { return x; }
     public double getY() { return y; }

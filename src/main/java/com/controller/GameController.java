@@ -27,6 +27,10 @@ public class GameController {
     private Line tempWire = null;
     private double timeSinceLastPacket = 0.0;
 
+    private boolean isDraggingBendPoint = false;
+    private Connection activeConnection = null;
+    private int activeBendPointIndex = -1;
+
 
     public GameController(GameState gameState, GameView gameView, MainApplication mainApp) {
         if (gameState == null || gameView == null || mainApp == null) {
@@ -76,6 +80,7 @@ public class GameController {
         handlePacketMovementAndArrival(scaledDeltaTime);
         updateSystemLogic(scaledDeltaTime);
         updateAntiTrojanSystems(scaledDeltaTime);
+        checkAndDestroyWires();
 
         if (gameView != null) {
             gameView.updatePacketPositions(gameState);
@@ -295,10 +300,45 @@ public class GameController {
     }
 
     public void handleMousePress(MouseEvent event) {
-        if (isWiring || gameView == null) return;
-        Point2D localClick = gameView.sceneToLocal(event.getSceneX(), event.getSceneY());
-        Port clickedPort = findClickedPort(localClick.getX(), localClick.getY(), PortType.OUTPUT);
+        if (gameView == null || gameState == null || isWiring || isDraggingBendPoint) {
+            return;
+        }
 
+        Point2D localClick = gameView.sceneToLocal(event.getSceneX(), event.getSceneY());
+
+        final double BEND_POINT_CLICK_RADIUS = 6.0;
+        for (Connection conn : gameState.getConnections()) {
+            List<Point2D> bendPoints = conn.getBendPoints();
+            for (int i = 0; i < bendPoints.size(); i++) {
+                if (bendPoints.get(i).distance(localClick) < BEND_POINT_CLICK_RADIUS) {
+                    isDraggingBendPoint = true;
+                    activeConnection = conn;
+                    activeBendPointIndex = i;
+                    System.out.println("Started dragging bend point " + i);
+                    return;
+                }
+            }
+        }
+
+
+        Connection clickedConnection = findClickedConnection(localClick.getX(), localClick.getY());
+        if (clickedConnection != null) {
+
+            Port clickedPortCheck = findClickedPort(localClick.getX(), localClick.getY(), PortType.OUTPUT);
+            if (clickedPortCheck == null) {
+                if (gameState.getCoins() >= 1) {
+                    if (gameState.decreaseCoins(1)) {
+                        clickedConnection.addBendPoint(localClick);
+                        gameView.redrawAll(gameState);
+                    }
+                } else {
+                    System.out.println("Not enough coins to add a bend point.");
+                }
+                return;
+            }
+        }
+
+        Port clickedPort = findClickedPort(localClick.getX(), localClick.getY(), PortType.OUTPUT);
         if (clickedPort != null && !clickedPort.isConnected()) {
             isWiring = true;
             wiringStartPort = clickedPort;
@@ -459,8 +499,7 @@ public class GameController {
         return true;
     }
 
-<<<<<<< Updated upstream
-=======
+
     private Connection findClickedConnection(double clickX, double clickY) {
         if (gameState == null) return null;
         final double clickThreshold = 5.0;
@@ -495,7 +534,37 @@ public class GameController {
         }
     }
 
->>>>>>> Stashed changes
+    private void checkAndDestroyWires() {
+        if (gameState == null) return;
+
+        var iterator = gameState.getConnections().iterator();
+        boolean wiresWereDestroyed = false;
+
+        while(iterator.hasNext()){
+            Connection conn = iterator.next();
+            if(conn.getLargePacketPassages() >= 3){
+                System.out.println("Connection " + conn.getId() + " destroyed after 3 LARGE packet passages.");
+
+                for(Packet p : new ArrayList<>(gameState.getPackets())){
+                    if(p.getCurrentConnection() == conn){
+                        gameState.registerCompletelyLostPacket(p);
+                        gameState.removePacket(p);
+                    }
+                }
+
+                conn.getStartPort().setConnectedConnection(null);
+                conn.getEndPort().setConnectedConnection(null);
+
+                iterator.remove();
+                wiresWereDestroyed = true;
+            }
+        }
+
+        if (wiresWereDestroyed) {
+            gameView.redrawAll(gameState);
+        }
+    }
+
     public void pauseGameLogic() {
         if (gameState != null) gameState.setGameLogicPaused(true);
     }

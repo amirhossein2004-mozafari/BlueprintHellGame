@@ -3,16 +3,21 @@ package com.blueprinthell;
 import com.controller.*;
 import com.model.GameState;
 import com.utils.LevelLoader;
+import com.utils.SaveManager;
 import com.view.*;
 import javafx.application.Application;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.BorderPane;
 import javafx.stage.Stage;
 import java.util.Objects;
+import java.util.Optional;
+
 import javafx.scene.layout.Pane;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.paint.Color;
@@ -49,9 +54,73 @@ public class MainApplication extends Application {
         AudioManager.loadSounds();
         AudioManager.playMenuBackgroundMusic(true);
 
+        GameState savedGame = SaveManager.loadGame();
+        if (savedGame != null) {
+            // A save file exists, ask the user what to do.
+            Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION);
+            confirmation.setTitle("ادامه بازی");
+            confirmation.setHeaderText("یک بازی ذخیره شده پیدا شد.");
+            confirmation.setContentText("آیا مایلید بازی قبلی را ادامه دهید؟");
+
+            ButtonType continueButton = new ButtonType("بله، ادامه بده");
+            ButtonType newGameButton = new ButtonType("نه، بازی جدید");
+
+            confirmation.getButtonTypes().setAll(continueButton, newGameButton);
+
+            Optional<ButtonType> result = confirmation.showAndWait();
+
+            if (result.isPresent() && result.get() == continueButton) {
+                // User chose to continue.
+                System.out.println("User chose to continue saved game.");
+                // We need a method to start the game directly with a loaded state.
+                startGameWithLoadedState(savedGame);
+                primaryStage.show();
+                return; // Important to exit here
+            } else {
+                // User chose a new game, delete the old save file.
+                System.out.println("User chose new game. Deleting old save.");
+                // You need to add a delete method to SaveManager
+                // SaveManager.deleteSaveFile();
+            }
+        }
+
         MenuController menuController = new MenuController(this);
         showMainMenu(menuController);
         primaryStage.show();
+    }
+
+    public void startGameWithLoadedState(GameState loadedGameState) {
+        this.currentLevelNumberPlayed = loadedGameState.getCurrentLevelNumber();
+        this.completedGameStateForGameOver = null;
+
+        stopCurrentGameLoop();
+        this.gameState = loadedGameState; // Use the loaded state!
+
+        // The rest of the setup is identical to startGame(int levelNumber)
+        double gameViewHeight = Config.WINDOW_HEIGHT - Config.HUD_HEIGHT;
+        this.gameView = new GameView(Config.WINDOW_WIDTH, gameViewHeight);
+        this.hudView = new HudView(this.gameState);
+
+        BorderPane rootNode = new BorderPane();
+        rootNode.setStyle("-fx-background-color: " + Config.COLOR_BACKGROUND.toString().substring(2) + ";");
+        rootNode.setTop(this.hudView);
+        rootNode.setCenter(this.gameView);
+
+        this.gameController = new GameController(this.gameState, this.gameView, this);
+        // IMPORTANT: Unlike a fresh start, we don't call initializeGame(). We just draw.
+        this.gameView.redrawAll(this.gameState);
+
+        this.shopControllerInstance = new ShopController(this, this.gameState, this.gameController);
+        AudioManager.playGameBackgroundMusic(true);
+        Scene gameScene = new Scene(rootNode, Config.WINDOW_WIDTH, Config.WINDOW_HEIGHT);
+        setupInputHandlers(gameScene, this.gameController, this.hudView);
+        applyStylesheet(gameScene, "/styles/style.css");
+
+        this.gameLoop = new GameLoop(this.gameController, this.gameState);
+        this.gameLoop.start();
+
+        primaryStage.setScene(gameScene);
+        System.out.println("Game started from loaded state for level " + this.currentLevelNumberPlayed);
     }
 
     public GameState getGameStateForGameOver() {
@@ -250,6 +319,9 @@ public class MainApplication extends Application {
                 System.out.println("MainApp (Input): Key " + code + " pressed while game logic is paused (NOT by shop).");
                 if (code == Config.KEY_EXIT_TO_MENU) {
                     System.out.println("MainApp (Input): Exit to Menu key pressed while paused. Returning to main menu.");
+                    if(this.gameState != null){
+                        SaveManager.saveGame(this.gameState);
+                    }
                     showMainMenu(new MenuController(this));
                 } else {
                     System.out.println("MainApp (Input): Key " + code + " ignored as game is paused (not by shop) and not Exit key.");

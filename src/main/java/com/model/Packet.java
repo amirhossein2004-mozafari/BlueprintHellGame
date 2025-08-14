@@ -7,6 +7,7 @@ import javafx.geometry.Point2D;
 import java.util.UUID;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.List;
 
 
 public class Packet {
@@ -32,12 +33,11 @@ public class Packet {
     private double currentMaxSpeedOnWire;
     private double inheritedStabilityDamage = 0.0;
     private double timeSpentIdleOffWireSeconds = 0.0;
-<<<<<<< Updated upstream
-=======
+
     private int currentSegmentIndex;
     private String parentLargePacketId = null;
     private int totalBitsForParent = 0;
->>>>>>> Stashed changes
+
 
     public Packet(PacketType type, double initialX, double initialY) {
         this.id = UUID.randomUUID().toString();
@@ -89,9 +89,18 @@ public class Packet {
         this.timeSpentIdleOffWireSeconds = 0.0;
         this.stabilityOnWire = 1.0 - this.inheritedStabilityDamage;
         this.inheritedStabilityDamage = 0.0;
+        this.currentSegmentIndex = 0;
 
-        this.setX(startPort.getAbsoluteX());
-        this.setY(startPort.getAbsoluteY());
+        List<Point2D> path = connection.getFullPath();
+        if (path.size() < 2) {
+            this.isOffWire = true;
+            return;
+        }
+        Point2D startPoint = path.get(0);
+        Point2D nextPoint = path.get(1);
+
+        this.setX(startPoint.getX());
+        this.setY(startPoint.getY());
 
         boolean compatibleStart = (this.type == startPort.getPacketType());
         double initialSpeedFactorToUse = 1.0;
@@ -123,12 +132,15 @@ public class Packet {
         if (direction.magnitudeSquared() < 0.0001) {
             direction = new Vector2D(1, 0);
         }
-        this.velocity.set(Vector2D.multiply(direction, this.currentMaxSpeedOnWire * initialSpeedFactorToUse));
+        double initialSpeed = this.currentMaxSpeedOnWire * initialSpeedFactorToUse;
+        double absoluteMaxInitialSpeed = Config.BASE_PACKET_SPEED * 1.5;
+        initialSpeed = Math.min(initialSpeed, absoluteMaxInitialSpeed);
 
         if (this.sizeLabel != null) {
             updateLabelPosition();
         }
     }
+
 
     public boolean update(double deltaTime) {
         if (deltaTime <= 0) return false;
@@ -147,89 +159,80 @@ public class Packet {
             return false;
         }
 
-        if (currentConnection == null || targetPort == null || startPort == null) {
+        if (currentConnection == null) {
             isOffWire = true;
-            timeSpentIdleOffWireSeconds = 0.0;
             return false;
+        }
+
+        List<Point2D> path = currentConnection.getFullPath();
+        if (currentSegmentIndex >= path.size() - 1) return true;
+
+        Point2D segmentStartPoint = path.get(currentSegmentIndex);
+        Point2D segmentEndPoint = path.get(currentSegmentIndex + 1);
+        Vector2D targetPos = new Vector2D(segmentEndPoint.getX(), segmentEndPoint.getY());
+        Vector2D packetPos = new Vector2D(this.x, this.y);
+
+        double distanceToTarget = packetPos.distance(targetPos);
+        double travelDistanceThisFrame = velocity.magnitude() * deltaTime;
+
+        if (distanceToTarget <= travelDistanceThisFrame * 1.05) {
+            this.setX(targetPos.getX());
+            this.setY(targetPos.getY());
+            currentSegmentIndex++;
+
+            if (currentSegmentIndex >= path.size() - 1) {
+                if (this.getType() == PacketType.LARGE) {
+                    this.currentConnection.registerLargePacketPassage();
+                    System.out.println("LARGE packet passed wire. Passages: " + this.currentConnection.getLargePacketPassages());
+                }
+                this.velocity.set(0, 0);
+                return true;
+            }
+
+            else {
+                Point2D nextTargetPoint = path.get(currentSegmentIndex + 1);
+                Vector2D newDirection = Vector2D.direction(targetPos, new Vector2D(nextTargetPoint.getX(), nextTargetPoint.getY()));
+                this.velocity.set(Vector2D.multiply(newDirection, this.velocity.magnitude()));
+            }
         }
 
         if (this.type == PacketType.TRIANGLE && this.acceleration > 0 && stabilityOnWire > Config.MIN_STABILITY_FOR_ACCELERATION) {
             if (velocity.magnitude() < this.currentMaxSpeedOnWire) {
-                Vector2D directionToTarget = Vector2D.direction(new Vector2D(x, y), new Vector2D(targetPort.getAbsoluteX(), targetPort.getAbsoluteY())).normalize();
-                if (directionToTarget.magnitudeSquared() < 0.0001 && velocity.magnitudeSquared() > 0.0001) directionToTarget = Vector2D.normalized(velocity);
-                if (directionToTarget.magnitudeSquared() < 0.0001) directionToTarget = new Vector2D(1,0);
-
-                Vector2D accelerationVector = Vector2D.multiply(directionToTarget, this.acceleration * deltaTime);
-                if (Vector2D.add(this.velocity, accelerationVector).magnitudeSquared() <= this.currentMaxSpeedOnWire * this.currentMaxSpeedOnWire) {
-                    this.velocity.add(accelerationVector);
-                } else {
-                    this.velocity.set(Vector2D.multiply(directionToTarget, this.currentMaxSpeedOnWire));
+                Vector2D directionToTarget = Vector2D.direction(packetPos, targetPos);
+                Vector2D accelVec = Vector2D.multiply(directionToTarget, this.acceleration * deltaTime);
+                if (Vector2D.add(new Vector2D(this.velocity), accelVec).magnitudeSquared() <= this.currentMaxSpeedOnWire * this.currentMaxSpeedOnWire) {
+                    this.velocity.add(accelVec);
                 }
             }
         }
 
-        Vector2D packetPosVec = new Vector2D(this.x, this.y);
-        Point2D p1_javafx = new Point2D(startPort.getAbsoluteX(), startPort.getAbsoluteY());
-        Point2D p2_javafx = new Point2D(targetPort.getAbsoluteX(), targetPort.getAbsoluteY());
-        double distanceFromWire;
-        double segmentDx = p2_javafx.getX() - p1_javafx.getX();
-        double segmentDy = p2_javafx.getY() - p1_javafx.getY();
-        double lineSegmentLengthSq = segmentDx * segmentDx + segmentDy * segmentDy;
-        Vector2D closestPointOnWireSegment;
+        Vector2D closestPointOnSegment;
+        double segmentDx = segmentEndPoint.getX() - segmentStartPoint.getX();
+        double segmentDy = segmentEndPoint.getY() - segmentStartPoint.getY();
+        double segmentLengthSq = segmentDx * segmentDx + segmentDy * segmentDy;
 
-        if (lineSegmentLengthSq < 0.0001) {
-            closestPointOnWireSegment = new Vector2D(p1_javafx.getX(), p1_javafx.getY());
+        if (segmentLengthSq < 0.0001) {
+            closestPointOnSegment = new Vector2D(segmentStartPoint.getX(), segmentStartPoint.getY());
         } else {
-            double t = ((packetPosVec.getX() - p1_javafx.getX()) * segmentDx + (packetPosVec.getY() - p1_javafx.getY()) * segmentDy) / lineSegmentLengthSq;
+            double t = ((packetPos.getX() - segmentStartPoint.getX()) * segmentDx + (packetPos.getY() - segmentStartPoint.getY()) * segmentDy) / segmentLengthSq;
             t = Math.max(0, Math.min(1, t));
-            closestPointOnWireSegment = new Vector2D(p1_javafx.getX() + t * segmentDx, p1_javafx.getY() + t * segmentDy);
+            closestPointOnSegment = new Vector2D(segmentStartPoint.getX() + t * segmentDx, segmentStartPoint.getY() + t * segmentDy);
         }
-        distanceFromWire = packetPosVec.distance(closestPointOnWireSegment);
+        double distanceFromWire = packetPos.distance(closestPointOnSegment);
 
         if (distanceFromWire > Config.MIN_DEVIATION_FOR_RETURN_FORCE && stabilityOnWire > Config.MIN_STABILITY_FOR_RETURN_FORCE) {
-            Vector2D forceToWireDir = Vector2D.subtract(closestPointOnWireSegment, packetPosVec).normalize();
-            if (forceToWireDir.magnitudeSquared() > 0.0001) {
-                double returnForceMag = Math.min(distanceFromWire * Config.WIRE_RETURN_FORCE_STRENGTH, Config.MAX_WIRE_RETURN_FORCE);
-                this.velocity.add(Vector2D.multiply(forceToWireDir, returnForceMag * stabilityOnWire * deltaTime));
-            }
+            Vector2D forceDir = Vector2D.subtract(closestPointOnSegment, packetPos).normalize();
+            double returnForceMag = Math.min(distanceFromWire * Config.WIRE_RETURN_FORCE_STRENGTH, Config.MAX_WIRE_RETURN_FORCE);
+            this.velocity.add(Vector2D.multiply(forceDir, returnForceMag * stabilityOnWire * deltaTime));
         }
 
         this.x += velocity.getX() * deltaTime;
         this.y += velocity.getY() * deltaTime;
         updateLabelPosition();
 
-
-        double totalWireLength = currentConnection.getLength();
-        Vector2D currentPosVec = new Vector2D(this.x, this.y);
-        Vector2D targetPosVec = new Vector2D(targetPort.getAbsoluteX(), targetPort.getAbsoluteY());
-
-        if (totalWireLength < Config.MIN_WIRE_LENGTH_FOR_PROGRESS_CALC || currentPosVec.distance(targetPosVec) < Config.ARRIVAL_DISTANCE_THRESHOLD) {
-            this.setX(targetPort.getAbsoluteX());
-            this.setY(targetPort.getAbsoluteY());
-            this.velocity.set(0, 0);
-            this.acceleration = 0;
-            return true;
-        }
-
-        Vector2D wireDir = Vector2D.direction(new Vector2D(startPort.getAbsoluteX(), startPort.getAbsoluteY()), targetPosVec);
-        if(wireDir.magnitudeSquared() < 0.0001) wireDir = new Vector2D(1,0);
-        double speedAlong = velocity.dot(wireDir);
-        if (speedAlong > 0) {
-            progressOnConnection += (speedAlong * deltaTime) / totalWireLength;
-        }
-        progressOnConnection = Math.max(0, Math.min(1.0, progressOnConnection));
-
         if (stabilityOnWire < Config.MIN_STABILITY_TO_STAY_ON_WIRE || distanceFromWire > Config.DEVIATION_THRESHOLD_FOR_OFF_WIRE) {
             isOffWire = true;
             timeSpentIdleOffWireSeconds = 0.0;
-        }
-
-        if (progressOnConnection >= Config.ARRIVAL_PROGRESS_THRESHOLD) {
-            this.setX(targetPort.getAbsoluteX());
-            this.setY(targetPort.getAbsoluteY());
-            this.velocity.set(0, 0);
-            this.acceleration = 0;
-            return true;
         }
 
         return false;
@@ -347,4 +350,5 @@ public class Packet {
     public void setParentLargePacketId(String parentLargePacketId) {
         this.parentLargePacketId = parentLargePacketId;
     }
+
 }

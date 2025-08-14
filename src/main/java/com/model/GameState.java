@@ -264,6 +264,10 @@ public class GameState {
         return false;
     }
 
+    public void setGameTimeElapsed(double time) {
+        this.gameTimeElapsedSeconds = time;
+    }
+
     public ReadOnlyIntegerProperty packetsToSpawnInLevelProperty() { return packetsToSpawnInLevelPropertyWrapper.getReadOnlyProperty(); }
 
     public boolean isGameLogicPaused() { return isGameLogicPaused.get(); }

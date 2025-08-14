@@ -42,8 +42,6 @@ public class LevelSelectionView extends VBox {
         level2Button.setOnAction(e -> mainApp.startGame(2));
         levelsGrid.add(level2Button, 1, 0);
 
-<<<<<<< Updated upstream
-=======
         Button level3Button = createLevelButton("مرحله ۳ (vpn)");
         level3Button.setOnAction(e -> mainApp.startGame(3));
         levelsGrid.add(level3Button, 2, 0);
@@ -59,7 +57,7 @@ public class LevelSelectionView extends VBox {
         Button level6Button = createLevelButton("مرحله 6 (تروجان)");
         level5Button.setOnAction(e -> mainApp.startGame(6));
         levelsGrid.add(level6Button, 2, 1);
->>>>>>> Stashed changes
+
 
         Button backButton = new Button("بازگشت به منوی اصلی");
         backButton.setPrefWidth(250);
