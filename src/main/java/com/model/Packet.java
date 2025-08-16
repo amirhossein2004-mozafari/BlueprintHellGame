@@ -74,12 +74,15 @@ public class Packet {
         return this.inheritedStabilityDamage;
     }
 
+
+
     public void startMoving(Connection connection) {
         if (connection == null || connection.getStartPort() == null || connection.getEndPort() == null) {
             this.isOffWire = true;
             this.velocity.set(Config.INITIAL_OFF_WIRE_VELOCITY_X, Config.INITIAL_OFF_WIRE_VELOCITY_Y);
             return;
         }
+
         this.currentConnection = connection;
         this.startPort = connection.getStartPort();
         this.targetPort = connection.getEndPort();
@@ -97,44 +100,43 @@ public class Packet {
             return;
         }
         Point2D startPoint = path.get(0);
-        Point2D nextPoint = path.get(1);
+        Point2D nextPointInPath = path.get(1);
 
         this.setX(startPoint.getX());
         this.setY(startPoint.getY());
 
         boolean compatibleStart = (this.type == startPort.getPacketType());
-        double initialSpeedFactorToUse = 1.0;
+        double initialSpeedFactor;
 
         if (this.type == PacketType.SQUARE) {
-            this.currentMaxSpeedOnWire = Config.BASE_PACKET_SPEED * (compatibleStart ? Config.SQUARE_COMPATIBLE_SPEED_FACTOR : Config.SQUARE_INCOMPATIBLE_SPEED_FACTOR);
-            initialSpeedFactorToUse = Config.SQUARE_INITIAL_SPEED_FACTOR;
+            this.currentMaxSpeedOnWire = Config.BASE_PACKET_SPEED;
+            initialSpeedFactor = compatibleStart ? Config.SQUARE_COMPATIBLE_SPEED_FACTOR : Config.SQUARE_INCOMPATIBLE_SPEED_FACTOR;
+        } else if (this.type == PacketType.TRIANGLE) {
+            this.currentMaxSpeedOnWire = Config.BASE_PACKET_SPEED * (compatibleStart ? Config.TRIANGLE_COMPATIBLE_SPEED_FACTOR : Config.TRIANGLE_INCOMPATIBLE_MAX_SPEED_FACTOR);
+            this.acceleration = compatibleStart ? 0 : Config.TRIANGLE_PACKET_ACCELERATION;
+            initialSpeedFactor = compatibleStart ? Config.TRIANGLE_COMPATIBLE_INITIAL_SPEED_FACTOR : Config.TRIANGLE_INCOMPATIBLE_INITIAL_SPEED_FACTOR;
         } else {
-            if (compatibleStart) {
-                this.currentMaxSpeedOnWire = Config.BASE_PACKET_SPEED * Config.TRIANGLE_COMPATIBLE_SPEED_FACTOR;
-                this.acceleration = 0;
-                initialSpeedFactorToUse = Config.TRIANGLE_COMPATIBLE_INITIAL_SPEED_FACTOR;
-            } else {
-                this.currentMaxSpeedOnWire = Config.BASE_PACKET_SPEED * Config.TRIANGLE_INCOMPATIBLE_MAX_SPEED_FACTOR;
-                this.acceleration = Config.TRIANGLE_PACKET_ACCELERATION;
-                initialSpeedFactorToUse = Config.TRIANGLE_INCOMPATIBLE_INITIAL_SPEED_FACTOR;
-            }
+
+            this.currentMaxSpeedOnWire = Config.BASE_PACKET_SPEED;
+            initialSpeedFactor = 1.0;
         }
 
         if (this.stabilityOnWire < Config.STABILITY_THRESHOLD_FOR_SPEED_REDUCTION) {
-            initialSpeedFactorToUse *= (Config.INTERMEDIATE_EXIT_SPEED_FACTOR_DAMAGED + this.stabilityOnWire);
-            initialSpeedFactorToUse = Math.max(Config.MIN_INITIAL_SPEED_FACTOR, initialSpeedFactorToUse);
+            initialSpeedFactor *= Math.max(Config.MIN_INITIAL_SPEED_FACTOR, Config.INTERMEDIATE_EXIT_SPEED_FACTOR_DAMAGED + this.stabilityOnWire);
         }
 
+        double initialSpeed = this.currentMaxSpeedOnWire * initialSpeedFactor;
+        initialSpeed = Math.min(initialSpeed, Config.ABSOLUTE_MAX_SPEED_AFTER_IMPACT);
+
         Vector2D direction = Vector2D.direction(
-                new Vector2D(startPort.getAbsoluteX(), startPort.getAbsoluteY()),
-                new Vector2D(targetPort.getAbsoluteX(), targetPort.getAbsoluteY())
+                new Vector2D(startPoint.getX(), startPoint.getY()),
+                new Vector2D(nextPointInPath.getX(), nextPointInPath.getY())
         );
         if (direction.magnitudeSquared() < 0.0001) {
             direction = new Vector2D(1, 0);
         }
-        double initialSpeed = this.currentMaxSpeedOnWire * initialSpeedFactorToUse;
-        double absoluteMaxInitialSpeed = Config.BASE_PACKET_SPEED * 1.5;
-        initialSpeed = Math.min(initialSpeed, absoluteMaxInitialSpeed);
+
+        this.velocity.set(Vector2D.multiply(direction, initialSpeed));
 
         if (this.sizeLabel != null) {
             updateLabelPosition();

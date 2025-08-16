@@ -306,11 +306,12 @@ public class GameController {
 
         Point2D localClick = gameView.sceneToLocal(event.getSceneX(), event.getSceneY());
 
-        final double BEND_POINT_CLICK_RADIUS = 6.0;
+        final double BEND_POINT_CLICK_RADIUS = 8.0;
         for (Connection conn : gameState.getConnections()) {
             List<Point2D> bendPoints = conn.getBendPoints();
             for (int i = 0; i < bendPoints.size(); i++) {
                 if (bendPoints.get(i).distance(localClick) < BEND_POINT_CLICK_RADIUS) {
+
                     isDraggingBendPoint = true;
                     activeConnection = conn;
                     activeBendPointIndex = i;
@@ -320,26 +321,9 @@ public class GameController {
             }
         }
 
-
-        Connection clickedConnection = findClickedConnection(localClick.getX(), localClick.getY());
-        if (clickedConnection != null) {
-
-            Port clickedPortCheck = findClickedPort(localClick.getX(), localClick.getY(), PortType.OUTPUT);
-            if (clickedPortCheck == null) {
-                if (gameState.getCoins() >= 1) {
-                    if (gameState.decreaseCoins(1)) {
-                        clickedConnection.addBendPoint(localClick);
-                        gameView.redrawAll(gameState);
-                    }
-                } else {
-                    System.out.println("Not enough coins to add a bend point.");
-                }
-                return;
-            }
-        }
-
         Port clickedPort = findClickedPort(localClick.getX(), localClick.getY(), PortType.OUTPUT);
         if (clickedPort != null && !clickedPort.isConnected()) {
+
             isWiring = true;
             wiringStartPort = clickedPort;
             tempWire = new Line(clickedPort.getAbsoluteX(), clickedPort.getAbsoluteY(), localClick.getX(), localClick.getY());
@@ -347,61 +331,82 @@ public class GameController {
             tempWire.setStroke(Config.COLOR_WIRE_TEMP_INVALID);
             tempWire.setMouseTransparent(true);
             gameView.addNode(tempWire);
+            return;
+        }
+
+        Connection clickedConnection = findClickedConnection(localClick.getX(), localClick.getY());
+        if (clickedConnection != null) {
+
+            if (gameState.getCoins() >= 1) {
+                if (gameState.decreaseCoins(1)) {
+                    clickedConnection.addBendPoint(localClick);
+                    gameView.redrawAll(gameState);
+                }
+            } else {
+                System.out.println("Not enough coins to add a bend point.");
+            }
+            return;
         }
     }
 
     public void handleMouseDrag(MouseEvent event) {
-        if (isWiring && tempWire != null && wiringStartPort != null && gameView != null && gameState != null) {
-            Point2D localDrag = gameView.sceneToLocal(event.getSceneX(), event.getSceneY());
+        if (gameView == null) return;
+        Point2D localDrag = gameView.sceneToLocal(event.getSceneX(), event.getSceneY());
+
+        if (isWiring && tempWire != null) {
             tempWire.setEndX(localDrag.getX());
             tempWire.setEndY(localDrag.getY());
-
             Port potentialTargetPort = findClickedPort(localDrag.getX(), localDrag.getY(), PortType.INPUT);
-            double currentTempLength = new Point2D(wiringStartPort.getAbsoluteX(), wiringStartPort.getAbsoluteY())
-                    .distance(localDrag.getX(), localDrag.getY());
+            double currentTempLength = new Point2D(wiringStartPort.getAbsoluteX(), wiringStartPort.getAbsoluteY()).distance(localDrag.getX(), localDrag.getY());
 
-            if (potentialTargetPort != null && !potentialTargetPort.isConnected() &&
-                    isValidConnectionAttempt(wiringStartPort, potentialTargetPort) &&
-                    gameState.getRemainingWireLength() >= currentTempLength) {
+            if (potentialTargetPort != null && !potentialTargetPort.isConnected() && isValidConnectionAttempt(wiringStartPort, potentialTargetPort) && gameState.getRemainingWireLength() >= currentTempLength) {
                 tempWire.setStroke(Config.COLOR_WIRE_TEMP_VALID);
             } else {
                 tempWire.setStroke(Config.COLOR_WIRE_TEMP_INVALID);
             }
+        } else if (isDraggingBendPoint && activeConnection != null) {
+            activeConnection.moveBendPoint(activeBendPointIndex, localDrag);
+            gameView.redrawAll(gameState);
         }
     }
 
+
     public void handleMouseRelease(MouseEvent event) {
-        boolean connectionMadeSuccessfully = false;
-        if (isWiring && wiringStartPort != null && tempWire != null && gameState != null && gameView != null) {
+
+        if (isWiring && wiringStartPort != null) {
             Point2D localReleaseCoords = gameView.sceneToLocal(event.getSceneX(), event.getSceneY());
             Port targetPort = findClickedPort(localReleaseCoords.getX(), localReleaseCoords.getY(), PortType.INPUT);
 
             if (targetPort != null && !targetPort.isConnected() && isValidConnectionAttempt(wiringStartPort, targetPort)) {
                 double requiredLength = new Point2D(wiringStartPort.getAbsoluteX(), wiringStartPort.getAbsoluteY())
                         .distance(targetPort.getAbsoluteX(), targetPort.getAbsoluteY());
+
                 if (gameState.getRemainingWireLength() >= requiredLength) {
                     if (gameState.useWire(requiredLength)) {
                         Connection newConnection = new Connection(wiringStartPort, targetPort);
                         gameState.addConnection(newConnection);
-                        connectionMadeSuccessfully = true;
                         AudioManager.playSoundEffect(AudioManager.SFX_CONNECT_SUCCESS);
-                        System.out.println("GC.Wire: Connection CREATED. Length: " + String.format("%.0f", requiredLength));
                     }
-                } else {
-                    System.out.println("GC.Wire: FAILED - Not enough wire. Required: " + String.format("%.0f", requiredLength));
                 }
-            } else {
-                String reason = (targetPort == null) ? "No target port." : (!isValidConnectionAttempt(wiringStartPort, targetPort)) ? "Invalid attempt." : "Target already connected.";
-                System.out.println("GC.Wire: FAILED - " + reason);
             }
         }
+
+        else if (isDraggingBendPoint) {
+
+            System.out.println("Finished dragging bend point.");
+        }
+
 
         isWiring = false;
         wiringStartPort = null;
         if (tempWire != null) {
-            if (gameView != null) gameView.removeNode(tempWire);
+            gameView.removeNode(tempWire);
             tempWire = null;
         }
+
+        isDraggingBendPoint = false;
+        activeConnection = null;
+        activeBendPointIndex = -1;
 
         if (gameState != null) {
             for (SystemNode system : gameState.getSystems()) {
@@ -502,7 +507,7 @@ public class GameController {
 
     private Connection findClickedConnection(double clickX, double clickY) {
         if (gameState == null) return null;
-        final double clickThreshold = 5.0;
+        final double CLICK_THRESHOLD = 5.0;
 
         for (Connection conn : gameState.getConnections()) {
             List<Point2D> path = conn.getFullPath();
@@ -510,18 +515,40 @@ public class GameController {
                 Point2D p1 = path.get(i);
                 Point2D p2 = path.get(i + 1);
 
+                double segmentDx = p2.getX() - p1.getX();
+                double segmentDy = p2.getY() - p1.getY();
 
-                double left = Math.min(p1.getX(), p2.getX()) - clickThreshold;
-                double right = Math.max(p1.getX(), p2.getX()) + clickThreshold;
-                double top = Math.min(p1.getY(), p2.getY()) - clickThreshold;
-                double bottom = Math.max(p1.getY(), p2.getY()) + clickThreshold;
+                if (segmentDx == 0 && segmentDy == 0) {
+                    continue;
+                }
 
-                if (clickX >= left && clickX <= right && clickY >= top && clickY <= bottom) {
+                double segmentLengthSq = segmentDx * segmentDx + segmentDy * segmentDy;
 
+                double t = ((clickX - p1.getX()) * segmentDx + (clickY - p1.getY()) * segmentDy) / segmentLengthSq;
+
+                double closestX, closestY;
+
+                if (t < 0) {
+                    closestX = p1.getX();
+                    closestY = p1.getY();
+                } else if (t > 1) {
+                    closestX = p2.getX();
+                    closestY = p2.getY();
+                } else {
+                    closestX = p1.getX() + t * segmentDx;
+                    closestY = p1.getY() + t * segmentDy;
+                }
+
+                double dx = clickX - closestX;
+                double dy = clickY - closestY;
+                double distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < CLICK_THRESHOLD) {
                     return conn;
                 }
             }
         }
+
         return null;
     }
 

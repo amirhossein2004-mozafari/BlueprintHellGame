@@ -56,16 +56,40 @@ public class GameView extends Pane {
     }
 
     private void drawSingleWire(Connection connection) {
-        Line wireLine = new Line(
-                connection.getStartPort().getAbsoluteX(),
-                connection.getStartPort().getAbsoluteY(),
-                connection.getEndPort().getAbsoluteX(),
-                connection.getEndPort().getAbsoluteY()
-        );
-        wireLine.setStroke(Config.COLOR_WIRE_NORMAL);
-        wireLine.setStrokeWidth(Config.WIRE_THICKNESS);
-        wireLine.setMouseTransparent(true);
-        this.getChildren().add(wireLine);
+        List<javafx.geometry.Point2D> path = connection.getFullPath();
+        if (path.size() < 2) {
+            return;
+        }
+
+        for (int i = 0; i < path.size() - 1; i++) {
+            javafx.geometry.Point2D startPoint = path.get(i);
+            javafx.geometry.Point2D endPoint = path.get(i + 1);
+
+            Line wireSegment = new Line(
+                    startPoint.getX(),
+                    startPoint.getY(),
+                    endPoint.getX(),
+                    endPoint.getY()
+            );
+
+            wireSegment.setStroke(Config.COLOR_WIRE_NORMAL);
+            wireSegment.setStrokeWidth(Config.WIRE_THICKNESS);
+
+            wireSegment.setMouseTransparent(false);
+
+            this.getChildren().add(wireSegment);
+        }
+
+        for (int i = 1; i < path.size() - 1; i++) {
+            javafx.geometry.Point2D bendPoint = path.get(i);
+
+            Circle bendCircle = new Circle(bendPoint.getX(), bendPoint.getY(), 4, Config.COLOR_WIRE_HIGHLIGHT);
+            bendCircle.setStroke(Color.BLACK);
+            bendCircle.setStrokeWidth(1);
+            bendCircle.setMouseTransparent(false);
+
+            this.getChildren().add(bendCircle);
+        }
     }
 
     private void drawSingleSystem(SystemNode system) {

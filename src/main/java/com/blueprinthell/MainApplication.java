@@ -56,7 +56,7 @@ public class MainApplication extends Application {
 
         GameState savedGame = SaveManager.loadGame();
         if (savedGame != null) {
-            // A save file exists, ask the user what to do.
+
             Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION);
             confirmation.setTitle("ادامه بازی");
             confirmation.setHeaderText("یک بازی ذخیره شده پیدا شد.");
@@ -70,17 +70,15 @@ public class MainApplication extends Application {
             Optional<ButtonType> result = confirmation.showAndWait();
 
             if (result.isPresent() && result.get() == continueButton) {
-                // User chose to continue.
+
                 System.out.println("User chose to continue saved game.");
-                // We need a method to start the game directly with a loaded state.
                 startGameWithLoadedState(savedGame);
                 primaryStage.show();
-                return; // Important to exit here
+                return;
             } else {
-                // User chose a new game, delete the old save file.
+
                 System.out.println("User chose new game. Deleting old save.");
-                // You need to add a delete method to SaveManager
-                // SaveManager.deleteSaveFile();
+
             }
         }
 
@@ -94,9 +92,8 @@ public class MainApplication extends Application {
         this.completedGameStateForGameOver = null;
 
         stopCurrentGameLoop();
-        this.gameState = loadedGameState; // Use the loaded state!
+        this.gameState = loadedGameState;
 
-        // The rest of the setup is identical to startGame(int levelNumber)
         double gameViewHeight = Config.WINDOW_HEIGHT - Config.HUD_HEIGHT;
         this.gameView = new GameView(Config.WINDOW_WIDTH, gameViewHeight);
         this.hudView = new HudView(this.gameState);
@@ -107,7 +104,7 @@ public class MainApplication extends Application {
         rootNode.setCenter(this.gameView);
 
         this.gameController = new GameController(this.gameState, this.gameView, this);
-        // IMPORTANT: Unlike a fresh start, we don't call initializeGame(). We just draw.
+
         this.gameView.redrawAll(this.gameState);
 
         this.shopControllerInstance = new ShopController(this, this.gameState, this.gameController);

@@ -1,0 +1,154 @@
+{
+    "coins": 2,
+    "systems": [
+        {
+            "role": "SOURCE",
+            "x": 100,
+            "y": 220,
+            "id": 0
+        },
+        {
+            "role": "INTERMEDIATE",
+            "x": 400,
+            "y": 160,
+            "id": 1
+        },
+        {
+            "role": "INTERMEDIATE",
+            "x": 500,
+            "y": 320,
+            "id": 2
+        },
+        {
+            "role": "INTERMEDIATE",
+            "x": 550,
+            "y": 500,
+            "id": 3
+        },
+        {
+            "role": "INTERMEDIATE",
+            "x": 300,
+            "y": 400,
+            "id": 4
+        },
+        {
+            "role": "SINK",
+            "x": 750,
+            "y": 300,
+            "id": 5
+        }
+    ],
+    "gameTimeElapsed": 7.600066399999993,
+    "levelNumber": 1,
+    "remainingWireLength": 5784.489213890805,
+    "connections": [
+        {
+            "bendPoints": [],
+            "startSystemIndex": 0,
+            "endPortIndex": 0,
+            "endSystemIndex": 1,
+            "startPortIndex": 0
+        },
+        {
+            "bendPoints": [],
+            "startSystemIndex": 0,
+            "endPortIndex": 0,
+            "endSystemIndex": 4,
+            "startPortIndex": 1
+        },
+        {
+            "bendPoints": [],
+            "startSystemIndex": 0,
+            "endPortIndex": 1,
+            "endSystemIndex": 4,
+            "startPortIndex": 2
+        },
+        {
+            "bendPoints": [],
+            "startSystemIndex": 4,
+            "endPortIndex": 1,
+            "endSystemIndex": 3,
+            "startPortIndex": 1
+        },
+        {
+            "bendPoints": [],
+            "startSystemIndex": 4,
+            "endPortIndex": 0,
+            "endSystemIndex": 2,
+            "startPortIndex": 0
+        },
+        {
+            "bendPoints": [],
+            "startSystemIndex": 1,
+            "endPortIndex": 0,
+            "endSystemIndex": 3,
+            "startPortIndex": 0
+        },
+        {
+            "bendPoints": [],
+            "startSystemIndex": 2,
+            "endPortIndex": 0,
+            "endSystemIndex": 5,
+            "startPortIndex": 0
+        },
+        {
+            "bendPoints": [],
+            "startSystemIndex": 2,
+            "endPortIndex": 1,
+            "endSystemIndex": 5,
+            "startPortIndex": 1
+        },
+        {
+            "bendPoints": [],
+            "startSystemIndex": 3,
+            "endPortIndex": 2,
+            "endSystemIndex": 5,
+            "startPortIndex": 0
+        },
+        {
+            "bendPoints": [],
+            "startSystemIndex": 3,
+            "endPortIndex": 3,
+            "endSystemIndex": 5,
+            "startPortIndex": 1
+        }
+    ],
+    "packets": [
+        {
+            "noiseLevel": 0,
+            "x": 172,
+            "y": 276.25,
+            "velocityX": 0,
+            "type": "SQUARE",
+            "velocityY": 0,
+            "currentSize": 2
+        },
+        {
+            "noiseLevel": 0,
+            "x": 172,
+            "y": 257.5,
+            "velocityX": 0,
+            "type": "TRIANGLE",
+            "velocityY": 0,
+            "currentSize": 3
+        },
+        {
+            "noiseLevel": 0,
+            "x": 486.9300792384813,
+            "y": 254.35582500700716,
+            "velocityX": 12.272153127725787,
+            "type": "TRIANGLE",
+            "velocityY": 46.734071503839424,
+            "currentSize": 3
+        },
+        {
+            "noiseLevel": 0,
+            "x": 216.95643098472237,
+            "y": 230.89214924525504,
+            "velocityX": 41.916956909794465,
+            "type": "TRIANGLE",
+            "velocityY": -7.326586748004328,
+            "currentSize": 3
+        }
+    ]
+}

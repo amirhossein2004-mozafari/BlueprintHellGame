@@ -186,12 +186,11 @@ public class SystemNode {
         }
 
         if (this.role == SystemRole.DISTRIBUTE) {
-
             if (packet.getType() == PacketType.LARGE) {
-                System.out.println("Distribute system received a LARGE packet, size: " + packet.getCurrentSize());
-
                 final int numberOfBits = packet.getCurrentSize();
                 final String parentId = packet.getId();
+
+                System.out.println("Distribute system received LARGE packet (" + parentId.substring(0,4) + ") size " + numberOfBits);
 
                 for (int i = 0; i < numberOfBits; i++) {
                     Connection outputConn = findAnyFreeOutputConnection(this, gameState);
@@ -206,13 +205,10 @@ public class SystemNode {
                         gameState.addPacket(bitPacket);
                     }
                 }
-                System.out.println("Distribute system spawned " + numberOfBits + " bit-packets.");
-
             } else {
 
                 storedPackets.add(packet);
             }
-
             gameState.removePacket(packet);
             return;
         }
@@ -221,28 +217,34 @@ public class SystemNode {
             if (packet.getType() == PacketType.BIT_PACKET) {
                 String parentId = packet.getParentLargePacketId();
                 if (parentId != null) {
+
                     List<Packet> bitsForParent = receivedBitPackets.computeIfAbsent(parentId, k -> new ArrayList<>());
                     bitsForParent.add(packet);
 
-                    System.out.println("Merge system received bit-packet for parent " + parentId +
-                            ". Total received: " + bitsForParent.size() + "/" + packet.getTotalBitsForParent());
+                    int totalBitsExpected = packet.getTotalBitsForParent();
+                    System.out.println("Merge system received bit-packet for parent " + parentId.substring(0,4) +
+                            ". Total received: " + bitsForParent.size() + "/" + totalBitsExpected);
 
-                    if (bitsForParent.size() == packet.getTotalBitsForParent()) {
-                        System.out.println("All bits for " + parentId + " collected! Reconstructing LARGE packet.");
+                    if (totalBitsExpected > 0 && bitsForParent.size() == totalBitsExpected) {
+                        System.out.println("All bits for " + parentId.substring(0,4) + " collected! Reconstructing LARGE packet.");
 
-                        Packet reconstructedLargePacket = new Packet(PacketType.LARGE, this.x, this.y);
+                        Packet reconstructedLargePacket = new Packet(PacketType.LARGE, this.getX(), this.getY());
                         reconstructedLargePacket.setCurrentSize(bitsForParent.size());
 
                         for (Packet bit : bitsForParent) {
                             gameState.removePacket(bit);
                         }
+
                         receivedBitPackets.remove(parentId);
+
                         storedPackets.add(reconstructedLargePacket);
                     }
                 }
             } else {
+
                 storedPackets.add(packet);
             }
+
             gameState.removePacket(packet);
             return;
         }
