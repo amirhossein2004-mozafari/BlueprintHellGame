@@ -7,7 +7,7 @@ public class Port {
 
     private final SystemNode parentSystem;
     private final PortType type;
-    private final PacketType packetType;
+    private PacketType packetType;
     private final Point2D relativePosition;
     private transient Shape visualShape = null;
     private Connection connectedConnection = null;
@@ -62,4 +62,7 @@ public class Port {
         this.visualShape = visualShape;
     }
 
+    public void setPacketType(PacketType packetType) {
+        this.packetType = packetType;
+    }
 }

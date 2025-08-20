@@ -5,38 +5,38 @@
   "initialWireLength": 10000.0,
   "systems": [
     {
-      "x": 50,
-      "y": 300,
+      "x": 80,
+      "y": 350,
       "role": "SOURCE",
       "ports": { "squareOutputs": 1 }
     },
     {
       "x": 250,
-      "y": 300,
+      "y": 350,
       "role": "DISTRIBUTE",
       "ports": { "squareInputs": 1, "triangleOutputs": 2, "squareOutputs": 2 }
     },
     {
-      "x": 450,
+      "x": 470,
       "y": 150,
       "role": "INTERMEDIATE",
-      "ports": { "triangleInputs": 1, "squareInputs": 1, "triangleOutputs": 1, "squareOutputs": 1 }
+      "ports": { "triangleInputs": 0, "squareInputs": 2, "triangleOutputs": 0, "squareOutputs": 2 }
     },
     {
-      "x": 450,
-      "y": 450,
+      "x": 470,
+      "y": 550,
       "role": "INTERMEDIATE",
-      "ports": { "triangleInputs": 1, "squareInputs": 1, "triangleOutputs": 1, "squareOutputs": 1 }
+      "ports": { "triangleInputs": 2, "squareInputs": 0, "triangleOutputs": 2, "squareOutputs": 0 }
     },
     {
-      "x": 650,
-      "y": 300,
+      "x": 690,
+      "y": 350,
       "role": "MERGE",
       "ports": { "triangleInputs": 2, "squareInputs": 2, "squareOutputs": 1 }
     },
     {
-      "x": 850,
-      "y": 300,
+      "x": 860,
+      "y": 350,
       "role": "SINK",
       "ports": { "squareInputs": 1 }
     }

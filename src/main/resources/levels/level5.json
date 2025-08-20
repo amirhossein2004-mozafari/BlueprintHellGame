@@ -1,18 +1,13 @@
 {
   "levelNumber": 5,
-  "packetsToSpawn": 20,
-  "levelDurationSeconds": 150.0,
+  "packetsToSpawn": 25,
+  "levelDurationSeconds": 180.0,
+  "initialWireLength": 8000.0,
   "systems": [
-    { "x": 100, "y": 150, "role": "SOURCE",
-      "ports": { "squareOutputs": 1 }
-    },
-    { "x": 300, "y": 150, "role": "SPY",
-      "ports": { "squareInputs": 1, "squareOutputs": 1 }
-    },
-    { "x": 500, "y": 350, "role": "SPY",
-      "ports": { "squareInputs": 1, "squareOutputs": 1 }
-    },
-    { "x": 700, "y": 150, "role": "SINK", "ports": { "squareInputs": 1 } },
-    { "x": 700, "y": 350, "role": "SINK", "ports": { "squareInputs": 1 } }
+    { "x": 100, "y": 300, "role": "SOURCE", "ports": { "squareOutputs": 1 }},
+    { "x": 350, "y": 150, "role": "SPY", "ports": { "squareInputs": 1, "squareOutputs": 1 }},
+    { "x": 350, "y": 450, "role": "SPY", "ports": { "squareInputs": 1, "squareOutputs": 1 }},
+    { "x": 700, "y": 150, "role": "SINK", "ports": { "squareInputs": 1 }},
+    { "x": 700, "y": 450, "role": "SINK", "ports": { "squareInputs": 1 }}
   ]
 }

@@ -7,5 +7,7 @@ public enum PacketType {
     TROJAN,
     MESSENGER_INFINITY,
     LARGE,
-    BIT_PACKET
+    BIT_PACKET,
+    LARGE_8,
+    LARGE_10
 }

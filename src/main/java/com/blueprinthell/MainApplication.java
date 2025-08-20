@@ -223,7 +223,15 @@ public class MainApplication extends Application {
         this.gameState = LevelLoader.loadLevel(levelNumber);
 
         if (this.gameState == null) {
-            System.err.println("MainApplication.startGame: CRITICAL - Failed to load level " + levelNumber + ". GameState is null. Returning to main menu.");
+            System.err.println("MainApplication: Failed to load level " + levelNumber + ". Returning to main menu.");
+
+
+            Alert errorAlert = new Alert(Alert.AlertType.ERROR);
+            errorAlert.setTitle("خطا در بارگذاری مرحله");
+            errorAlert.setHeaderText("فایل مرحله " + levelNumber + " پیدا نشد.");
+            errorAlert.setContentText("لطفاً مطمئن شوید فایل level" + levelNumber + ".json در پوشه resources/levels وجود دارد.");
+            errorAlert.showAndWait();
+
             showMainMenu(new MenuController(this));
             return;
         }

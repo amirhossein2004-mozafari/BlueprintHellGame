@@ -19,9 +19,8 @@ public class LevelLoader {
         try (InputStream inputStream = LevelLoader.class.getResourceAsStream(fileName)) {
 
             if (inputStream == null) {
-                System.err.println("LevelLoader Error: Could not find level file: " + fileName);
-                System.err.println("LevelLoader: Returning a default GameState for level " + levelNumberToLoad + " due to missing file.");
-                return new GameState(levelNumberToLoad, 30, 90.0);
+                System.err.println("LevelLoader CRITICAL Error: Could not find level file: " + fileName);
+                return null;
             }
 
             try (Scanner scanner = new Scanner(inputStream, StandardCharsets.UTF_8)) {
@@ -32,6 +31,7 @@ public class LevelLoader {
                 }
                 String jsonContent = scanner.useDelimiter("\\A").next();
                 JSONObject levelJson = new JSONObject(jsonContent);
+
 
                 int jsonInternalLevelNum = levelJson.optInt("levelNumber", levelNumberToLoad);
                 if (jsonInternalLevelNum != levelNumberToLoad) {
@@ -75,10 +75,9 @@ public class LevelLoader {
             }
 
         } catch (IOException e) {
-            System.err.println("LevelLoader IO Error: Reading level " + levelNumberToLoad + " from file: " + fileName);
+            System.err.println("LevelLoader Error: Failed to process " + fileName);
             e.printStackTrace();
-            System.err.println("LevelLoader: Returning a default GameState for level " + levelNumberToLoad + " due to IO error.");
-            return new GameState(levelNumberToLoad, 50, 180.0);
+            return null;
         } catch (Exception e) {
             System.err.println("LevelLoader Error: Processing level " + levelNumberToLoad + " from file: " + fileName);
             e.printStackTrace();

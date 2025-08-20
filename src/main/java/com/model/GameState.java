@@ -250,6 +250,25 @@ public class GameState {
         }
     }
 
+    public List<SystemNode> getSystemsByRole(SystemRole role) {
+        List<SystemNode> result = new ArrayList<>();
+        for (SystemNode system : this.systems) {
+            if (system.getRole() == role) {
+                result.add(system);
+            }
+        }
+        return result;
+    }
+
+
+    public boolean removeConnection(Connection connection) {
+        if (connection != null) {
+
+            return this.connections.remove(connection);
+        }
+        return false;
+    }
+
     private void applyAnahitaEffect() {
         for (Packet packet : new ArrayList<>(this.packets)) {
             if (packet != null) packet.setNoiseLevel(0.0);

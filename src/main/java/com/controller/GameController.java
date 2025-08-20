@@ -88,6 +88,7 @@ public class GameController {
         checkEndConditions();
     }
 
+
     private void spawnNewPackets(double scaledDeltaTime) {
         if (gameState == null) return;
 
@@ -159,70 +160,37 @@ public class GameController {
         return null;
     }
 
-    private void handlePacketMovementAndArrival(double scaledDeltaTime) {
-        if (gameState == null) {
-            return;
-        }
 
-        List<Packet> packetsToRemoveFromActiveList = new ArrayList<>();
+    private void handlePacketMovementAndArrival(double scaledDeltaTime) {
+        if (gameState == null) return;
+
+        List<Packet> packetsToRemove = new ArrayList<>();
+        List<Packet> arrivedPackets = new ArrayList<>();
 
         for (Packet packet : new ArrayList<>(gameState.getPackets())) {
-            if (packet == null) {
-                continue;
-            }
-
-            if (packet.getCurrentSize() <= 0) {
-                packetsToRemoveFromActiveList.add(packet);
-                continue;
-            }
-
-            boolean reachedEndOnWire = packet.update(scaledDeltaTime);
-
-            if (reachedEndOnWire) {
-                Port destinationPort = packet.getTargetPort();
-                if (destinationPort != null && destinationPort.getParentSystem() != null) {
-                    SystemNode destinationSystem = destinationPort.getParentSystem();
-                    destinationSystem.receivePacket(packet, gameState);
-                    if (packet.getCurrentConnection() == null) {
-                        packetsToRemoveFromActiveList.add(packet);
-                    }
-                } else {
-                    gameState.registerCompletelyLostPacket(packet);
-                    packetsToRemoveFromActiveList.add(packet);
-                }
+            if (packet.getCurrentSize() <= 0 || packet.update(scaledDeltaTime)) {
+                packetsToRemove.add(packet);
+                arrivedPackets.add(packet);
             } else if (packet.isOffWire()) {
-                double boundsOffset = Config.OFF_WIRE_BOUNDS_OFFSET;
-                boolean outOfBounds = packet.getX() < -boundsOffset || packet.getX() > Config.WINDOW_WIDTH + boundsOffset ||
-                        packet.getY() < -Config.HUD_HEIGHT - boundsOffset ||
-                        packet.getY() > Config.WINDOW_HEIGHT + boundsOffset;
 
-                if (outOfBounds) {
-                    gameState.registerCompletelyLostPacket(packet);
-                    packetsToRemoveFromActiveList.add(packet);
+            }
+        }
+
+        for (Packet arrivedPacket : arrivedPackets) {
+            if(arrivedPacket.getCurrentSize() > 0){
+                Port destPort = arrivedPacket.getTargetPort();
+                if (destPort != null && destPort.getParentSystem() != null) {
+                    destPort.getParentSystem().receivePacket(arrivedPacket, gameState);
                 } else {
-                    if (packet.getVelocity().magnitudeSquared() < Config.MIN_VELOCITY_SQUARED_TO_STOP_OFF_WIRE &&
-                            packet.getTimeSpentIdleOffWireSeconds() >= Config.MAX_IDLE_TIME_FOR_OFF_WIRE_PACKET_SECONDS) {
-
-                        gameState.registerCompletelyLostPacket(packet);
-                        packetsToRemoveFromActiveList.add(packet);
-                    }
+                    gameState.registerCompletelyLostPacket(arrivedPacket);
                 }
             }
         }
 
-        for (Packet p : packetsToRemoveFromActiveList) {
-            if (p == null) continue;
-
-            boolean removedFromState = gameState.removePacket(p);
-            String packetIdForLog = getPacketIdSafe(p);
-
-            if (removedFromState) {
-                if (gameView != null) {
-                    gameView.removePacketNode(p);
-                }
-                System.out.println("GC.PacketMovement: Packet " + packetIdForLog + " removed from active game and view.");
-            } else {
-                System.err.println("GC.PacketMovement WARNING: Failed to remove packet " + packetIdForLog + " from gameState's active list (was it already removed or not found?).");
+        for (Packet p : packetsToRemove) {
+            boolean removed = gameState.removePacket(p);
+            if (removed) {
+                gameView.removePacketNode(p);
             }
         }
     }
@@ -564,30 +532,32 @@ public class GameController {
     private void checkAndDestroyWires() {
         if (gameState == null) return;
 
-        var iterator = gameState.getConnections().iterator();
-        boolean wiresWereDestroyed = false;
 
-        while(iterator.hasNext()){
-            Connection conn = iterator.next();
-            if(conn.getLargePacketPassages() >= 3){
-                System.out.println("Connection " + conn.getId() + " destroyed after 3 LARGE packet passages.");
+        List<Connection> connectionsToRemove = new ArrayList<>();
+        for (Connection conn : new ArrayList<>(gameState.getConnections())) {
+            if (conn.getLargePacketPassages() >= 3) {
+                System.out.println("Connection " + conn.getId() + " marked for destruction.");
+                connectionsToRemove.add(conn);
+            }
+        }
 
-                for(Packet p : new ArrayList<>(gameState.getPackets())){
-                    if(p.getCurrentConnection() == conn){
+        if (!connectionsToRemove.isEmpty()) {
+            for (Connection connToRemove : connectionsToRemove) {
+
+
+                for (Packet p : new ArrayList<>(gameState.getPackets())) {
+                    if (p.getCurrentConnection() == connToRemove) {
                         gameState.registerCompletelyLostPacket(p);
                         gameState.removePacket(p);
                     }
                 }
 
-                conn.getStartPort().setConnectedConnection(null);
-                conn.getEndPort().setConnectedConnection(null);
+                if(connToRemove.getStartPort() != null) connToRemove.getStartPort().setConnectedConnection(null);
+                if(connToRemove.getEndPort() != null) connToRemove.getEndPort().setConnectedConnection(null);
 
-                iterator.remove();
-                wiresWereDestroyed = true;
+                gameState.removeConnection(connToRemove);
             }
-        }
 
-        if (wiresWereDestroyed) {
             gameView.redrawAll(gameState);
         }
     }

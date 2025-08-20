@@ -48,7 +48,15 @@ public class Packet {
         this.velocity = new Vector2D();
         if (type == PacketType.SQUARE) {
             this.initialSize = Config.PACKET_SQUARE_INITIAL_SIZE;
-        } else {
+        } else if (type == PacketType.BIT_PACKET) {
+            this.initialSize = 1;
+        }
+        else if (type == PacketType.LARGE_8) {
+            this.initialSize = 8;
+        } else if (type == PacketType.LARGE_10) {
+            this.initialSize = 10;
+        }
+        else {
             this.initialSize = Config.PACKET_TRIANGLE_INITIAL_SIZE;
         }
         this.currentSize = this.initialSize;
@@ -183,7 +191,7 @@ public class Packet {
             currentSegmentIndex++;
 
             if (currentSegmentIndex >= path.size() - 1) {
-                if (this.getType() == PacketType.LARGE) {
+                if (this.isLargePacket()) {
                     this.currentConnection.registerLargePacketPassage();
                     System.out.println("LARGE packet passed wire. Passages: " + this.currentConnection.getLargePacketPassages());
                 }
@@ -335,6 +343,18 @@ public class Packet {
         double labelOffsetY = -15;
         this.sizeLabel.setLayoutX(this.x + labelOffsetX);
         this.sizeLabel.setLayoutY(this.y + labelOffsetY);
+    }
+
+    public int getCurrentSegmentIndex() {
+        return currentSegmentIndex;
+    }
+
+    public void setCurrentSegmentIndex(int index) {
+        this.currentSegmentIndex = index;
+    }
+
+    public boolean isLargePacket() {
+        return this.type == PacketType.LARGE_8 || this.type == PacketType.LARGE_10;
     }
 
     public int getTotalBitsForParent() {

@@ -3,6 +3,7 @@ package com.view;
 import com.blueprinthell.Config;
 import com.model.*;
 
+import javafx.beans.binding.Bindings;
 import javafx.scene.Node;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
@@ -92,67 +93,74 @@ public class GameView extends Pane {
         }
     }
 
+
+
     private void drawSingleSystem(SystemNode system) {
+
         Rectangle systemBody = new Rectangle(system.getX(), system.getY(), system.getWidth(), system.getHeight());
 
 
+        Color bodyColor;
         if (system.getRole() == SystemRole.VPN) {
-            systemBody.setFill(Color.STEELBLUE);
+            bodyColor = Color.STEELBLUE;
         } else if (system.getRole() == SystemRole.SABOTEUR) {
-            systemBody.setFill(Color.rgb(139, 0, 0));
-        }
-        else if (system.getRole() == SystemRole.SPY) {
-            systemBody.setFill(Color.rgb(112, 128, 144));
-        }
-        else if (system.getRole() == SystemRole.ANTI_TROJAN) {
-            systemBody.setFill(Color.rgb(60, 179, 113));
-        }
-        else if (system.getRole() == SystemRole.DISTRIBUTE) {
-            systemBody.setFill(Color.ORANGE);
+            bodyColor = Color.FIREBRICK;
+        } else if (system.getRole() == SystemRole.SPY) {
+            bodyColor = Color.SLATEGRAY;
+        } else if (system.getRole() == SystemRole.ANTI_TROJAN) {
+            bodyColor = Color.MEDIUMSEAGREEN;
+        } else if (system.getRole() == SystemRole.DISTRIBUTE) {
+            bodyColor = Color.ORANGE;
         } else if (system.getRole() == SystemRole.MERGE) {
-            systemBody.setFill(Color.DARKORANGE);
+            bodyColor = Color.DARKORANGE;
+        } else {
+            bodyColor = Config.COLOR_SYSTEM_RECT;
         }
-        else {
-            systemBody.setFill(Config.COLOR_SYSTEM_RECT);
-        }
+        systemBody.setFill(bodyColor);
 
-
-        systemBody.setFill(Config.COLOR_SYSTEM_RECT);
         systemBody.setStroke(Color.BLACK);
         systemBody.setStrokeWidth(1);
         systemBody.setArcWidth(Config.SYSTEM_CORNER_ARC);
         systemBody.setArcHeight(Config.SYSTEM_CORNER_ARC);
         this.getChildren().add(systemBody);
 
-        Line divider = new Line(
-                system.getX() + Config.SYSTEM_DIVIDER_X_OFFSET, system.getY() + 3,
-                system.getX() + Config.SYSTEM_DIVIDER_X_OFFSET, system.getY() + system.getHeight() - 3
-        );
-        divider.setStroke(Config.COLOR_SYSTEM_DIVIDER);
-        divider.setStrokeWidth(1);
-        this.getChildren().add(divider);
+
+        if (system.getRole() != SystemRole.ANTI_TROJAN) {
+            Line divider = new Line(
+                    system.getX() + Config.SYSTEM_DIVIDER_X_OFFSET, system.getY() + 3,
+                    system.getX() + Config.SYSTEM_DIVIDER_X_OFFSET, system.getY() + system.getHeight() - 3
+            );
+            divider.setStroke(Config.COLOR_SYSTEM_DIVIDER);
+            divider.setStrokeWidth(1);
+            this.getChildren().add(divider);
+        }
 
         drawIndicatorForSystem(system);
         drawPortsForSystem(system.getInputPorts());
         drawPortsForSystem(system.getOutputPorts());
 
-        Label storedCountLabel = new Label();
-        String labelText = system.getStoredPacketCount() + "/" + Config.SYSTEM_PACKET_STORAGE_CAPACITY;
-        storedCountLabel.setText(labelText);
-        storedCountLabel.setFont(Font.font("Arial", FontWeight.BOLD, 10));
-        storedCountLabel.setTextFill(Color.WHITE);
+        if (system.getRole() == SystemRole.INTERMEDIATE ||
+                system.getRole() == SystemRole.SABOTEUR ||
+                system.getRole() == SystemRole.SPY ||
+                system.getRole() == SystemRole.MERGE ||
+                system.getRole() == SystemRole.DISTRIBUTE) {
 
-        double labelX = system.getX() + Config.SYSTEM_DIVIDER_X_OFFSET / 2.0 - storedCountLabel.prefWidth(-1) / 2.0;
-        double labelY = system.getY() + Config.INDICATOR_Y_POS + Config.INDICATOR_HEIGHT + 2;
+            Label storedCountLabel = new Label();
 
-        labelX = system.getX() + 3;
-        labelY = system.getY() + system.getHeight() - 12 - 3;
+            storedCountLabel.textProperty().bind(
+                    Bindings.format("%d/%d",
+                            system.getStoredPacketCount(),
+                            Config.SYSTEM_PACKET_STORAGE_CAPACITY
+                    )
+            );
+            storedCountLabel.setFont(Font.font("Arial", FontWeight.BOLD, 10));
+            storedCountLabel.setTextFill(Color.WHITE);
 
-        storedCountLabel.setLayoutX(labelX);
-        storedCountLabel.setLayoutY(labelY);
-        storedCountLabel.setMouseTransparent(true);
-
-        this.getChildren().add(storedCountLabel);
+            storedCountLabel.setLayoutX(system.getX() + 3);
+            storedCountLabel.setLayoutY(system.getY() + system.getHeight() - 15);
+            storedCountLabel.setMouseTransparent(true);
+            this.getChildren().add(storedCountLabel);
+        }
     }
 
     private void drawPortsForSystem(List<Port> ports) {
