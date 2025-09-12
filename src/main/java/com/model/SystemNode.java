@@ -9,8 +9,8 @@ import java.util.*;
 
 public class SystemNode {
 
-    private final double x;
-    private final double y;
+    private double x;
+    private double y;
     private final double width;
     private final double height;
     private final SystemRole role;
@@ -560,6 +560,12 @@ public class SystemNode {
         System.out.println("System " + (this.hashCode()%1000) + ": Port type randomized from " + oldType + " to " + newType);
         portToChange.setPacketType(newType);
 
+
+    }
+
+    public void setPosition(double x, double y) {
+        this.x = x;
+        this.y = y;
 
     }
 

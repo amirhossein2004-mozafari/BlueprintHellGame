@@ -152,7 +152,7 @@ public class Packet {
     }
 
 
-    public boolean update(double deltaTime) {
+    public boolean update(double deltaTime, GameState gameState) {
         if (deltaTime <= 0) return false;
 
         if (isOffWire) {
@@ -174,13 +174,14 @@ public class Packet {
             return false;
         }
 
-        List<Point2D> path = currentConnection.getFullPath();
+        final Vector2D packetPos = new Vector2D(this.x, this.y);
+        final List<Point2D> path = currentConnection.getFullPath();
+
         if (currentSegmentIndex >= path.size() - 1) return true;
 
         Point2D segmentStartPoint = path.get(currentSegmentIndex);
         Point2D segmentEndPoint = path.get(currentSegmentIndex + 1);
         Vector2D targetPos = new Vector2D(segmentEndPoint.getX(), segmentEndPoint.getY());
-        Vector2D packetPos = new Vector2D(this.x, this.y);
 
         double distanceToTarget = packetPos.distance(targetPos);
         double travelDistanceThisFrame = velocity.magnitude() * deltaTime;
@@ -207,7 +208,20 @@ public class Packet {
         }
 
         if (this.type == PacketType.TRIANGLE && this.acceleration > 0 && stabilityOnWire > Config.MIN_STABILITY_FOR_ACCELERATION) {
-            if (velocity.magnitude() < this.currentMaxSpeedOnWire) {
+
+            packetPos.set(this.x, this.y);
+
+            boolean hasAcceleration = true;
+            for (EffectPoint effect : gameState.getEffectPoints()) {
+                if (effect.getType() == EffectType.AERGIA_NO_ACCELERATION) {
+                    if (packetPos.distance(new Vector2D(effect.getPosition().getX(), effect.getPosition().getY())) < 10.0) {
+                        hasAcceleration = false;
+                        break;
+                    }
+                }
+            }
+
+            if (hasAcceleration && velocity.magnitude() < this.currentMaxSpeedOnWire) {
                 Vector2D directionToTarget = Vector2D.direction(packetPos, targetPos);
                 Vector2D accelVec = Vector2D.multiply(directionToTarget, this.acceleration * deltaTime);
                 if (Vector2D.add(new Vector2D(this.velocity), accelVec).magnitudeSquared() <= this.currentMaxSpeedOnWire * this.currentMaxSpeedOnWire) {
@@ -234,6 +248,18 @@ public class Packet {
             Vector2D forceDir = Vector2D.subtract(closestPointOnSegment, packetPos).normalize();
             double returnForceMag = Math.min(distanceFromWire * Config.WIRE_RETURN_FORCE_STRENGTH, Config.MAX_WIRE_RETURN_FORCE);
             this.velocity.add(Vector2D.multiply(forceDir, returnForceMag * stabilityOnWire * deltaTime));
+        }
+
+        for (EffectPoint effect : gameState.getEffectPoints()) {
+            if (effect.getType() == EffectType.ELIPHAS_CENTERING_FORCE) {
+                if (packetPos.distance(new Vector2D(effect.getPosition().getX(), effect.getPosition().getY())) < 15.0) {
+                    if (distanceFromWire > 0.5) {
+                        Vector2D forceToCenter = Vector2D.subtract(closestPointOnSegment, packetPos);
+                        double centeringForceStrength = 0.1;
+                        this.velocity.add(Vector2D.multiply(forceToCenter, centeringForceStrength));
+                    }
+                }
+            }
         }
 
         this.x += velocity.getX() * deltaTime;

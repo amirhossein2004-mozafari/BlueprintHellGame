@@ -2,6 +2,7 @@ package com.controller;
 
 import com.blueprinthell.Config;
 import com.blueprinthell.MainApplication;
+import com.model.EffectType;
 import com.model.GameState;
 import com.model.ShopSkill;
 import com.utils.AudioManager;
@@ -48,6 +49,15 @@ public class ShopController {
         } else {
             System.out.println("ShopController: Not enough coins to buy " + skill.name() +
                     ". Required: " + cost + ", Available: " + gameState.getCoins());
+        }
+    }
+
+
+    public void enterPlacementMode(EffectType effectType, int cost, double duration) {
+        if (gameState.getCoins() >= cost) {
+            System.out.println("Entering placement mode for: " + effectType);
+            gameController.startEffectPlacement(effectType, cost, duration);
+            closeShop();
         }
     }
 

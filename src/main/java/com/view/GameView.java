@@ -35,6 +35,7 @@ public class GameView extends Pane {
         portShapes.clear();
         drawConnections(gameState.getConnections());
         drawSystems(gameState.getSystems());
+        drawEffectPoints(gameState.getEffectPoints());
         drawPackets(gameState.getPackets());
     }
 
@@ -322,6 +323,26 @@ public class GameView extends Pane {
             if (nodeToRemove != null) {
                 this.getChildren().remove(nodeToRemove);
             }
+        }
+    }
+
+    private void drawEffectPoints(List<EffectPoint> effectPoints) {
+        for (EffectPoint effect : effectPoints) {
+            Circle effectCircle = new Circle(effect.getPosition().getX(), effect.getPosition().getY(), 6);
+
+            if (effect.getType() == EffectType.AERGIA_NO_ACCELERATION) {
+                effectCircle.setFill(Color.rgb(173, 216, 230, 0.5));
+                effectCircle.setStroke(Color.WHITE);
+                effectCircle.getStrokeDashArray().addAll(5.0, 5.0);
+            }
+            else if (effect.getType() == EffectType.ELIPHAS_CENTERING_FORCE) {
+                effectCircle.setFill(Color.rgb(144, 238, 144, 0.5));
+                effectCircle.setStroke(Color.GREENYELLOW);
+                effectCircle.getStrokeDashArray().addAll(2.0, 6.0);
+            }
+
+            effectCircle.setMouseTransparent(true);
+            this.getChildren().add(effectCircle);
         }
     }
 

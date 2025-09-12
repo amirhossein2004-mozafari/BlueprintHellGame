@@ -1,154 +1,178 @@
 {
-    "coins": 2,
-    "systems": [
-        {
-            "role": "SOURCE",
-            "x": 100,
-            "y": 220,
-            "id": 0
-        },
-        {
-            "role": "INTERMEDIATE",
-            "x": 400,
-            "y": 160,
-            "id": 1
-        },
-        {
-            "role": "INTERMEDIATE",
-            "x": 500,
-            "y": 320,
-            "id": 2
-        },
-        {
-            "role": "INTERMEDIATE",
-            "x": 550,
-            "y": 500,
-            "id": 3
-        },
-        {
-            "role": "INTERMEDIATE",
-            "x": 300,
-            "y": 400,
-            "id": 4
-        },
-        {
-            "role": "SINK",
-            "x": 750,
-            "y": 300,
-            "id": 5
-        }
-    ],
-    "gameTimeElapsed": 7.600066399999993,
-    "levelNumber": 1,
-    "remainingWireLength": 5784.489213890805,
-    "connections": [
-        {
-            "bendPoints": [],
-            "startSystemIndex": 0,
-            "endPortIndex": 0,
-            "endSystemIndex": 1,
-            "startPortIndex": 0
-        },
-        {
-            "bendPoints": [],
-            "startSystemIndex": 0,
-            "endPortIndex": 0,
-            "endSystemIndex": 4,
-            "startPortIndex": 1
-        },
-        {
-            "bendPoints": [],
-            "startSystemIndex": 0,
-            "endPortIndex": 1,
-            "endSystemIndex": 4,
-            "startPortIndex": 2
-        },
-        {
-            "bendPoints": [],
-            "startSystemIndex": 4,
-            "endPortIndex": 1,
-            "endSystemIndex": 3,
-            "startPortIndex": 1
-        },
-        {
-            "bendPoints": [],
-            "startSystemIndex": 4,
-            "endPortIndex": 0,
-            "endSystemIndex": 2,
-            "startPortIndex": 0
-        },
-        {
-            "bendPoints": [],
-            "startSystemIndex": 1,
-            "endPortIndex": 0,
-            "endSystemIndex": 3,
-            "startPortIndex": 0
-        },
-        {
-            "bendPoints": [],
-            "startSystemIndex": 2,
-            "endPortIndex": 0,
-            "endSystemIndex": 5,
-            "startPortIndex": 0
-        },
-        {
-            "bendPoints": [],
-            "startSystemIndex": 2,
-            "endPortIndex": 1,
-            "endSystemIndex": 5,
-            "startPortIndex": 1
-        },
-        {
-            "bendPoints": [],
-            "startSystemIndex": 3,
-            "endPortIndex": 2,
-            "endSystemIndex": 5,
-            "startPortIndex": 0
-        },
-        {
-            "bendPoints": [],
-            "startSystemIndex": 3,
-            "endPortIndex": 3,
-            "endSystemIndex": 5,
-            "startPortIndex": 1
-        }
-    ],
-    "packets": [
-        {
-            "noiseLevel": 0,
-            "x": 172,
-            "y": 276.25,
-            "velocityX": 0,
-            "type": "SQUARE",
-            "velocityY": 0,
-            "currentSize": 2
-        },
-        {
-            "noiseLevel": 0,
-            "x": 172,
-            "y": 257.5,
-            "velocityX": 0,
-            "type": "TRIANGLE",
-            "velocityY": 0,
-            "currentSize": 3
-        },
-        {
-            "noiseLevel": 0,
-            "x": 486.9300792384813,
-            "y": 254.35582500700716,
-            "velocityX": 12.272153127725787,
-            "type": "TRIANGLE",
-            "velocityY": 46.734071503839424,
-            "currentSize": 3
-        },
-        {
-            "noiseLevel": 0,
-            "x": 216.95643098472237,
-            "y": 230.89214924525504,
-            "velocityX": 41.916956909794465,
-            "type": "TRIANGLE",
-            "velocityY": -7.326586748004328,
-            "currentSize": 3
-        }
-    ]
+  "coins": 0,
+  "systems": [
+    {
+      "role": "SOURCE",
+      "x": 100,
+      "y": 220
+    },
+    {
+      "role": "INTERMEDIATE",
+      "x": 400,
+      "y": 160
+    },
+    {
+      "role": "INTERMEDIATE",
+      "x": 500,
+      "y": 320
+    },
+    {
+      "role": "INTERMEDIATE",
+      "x": 550,
+      "y": 500
+    },
+    {
+      "role": "INTERMEDIATE",
+      "x": 300,
+      "y": 400
+    },
+    {
+      "role": "SINK",
+      "x": 750,
+      "y": 300
+    }
+  ],
+  "gameTimeElapsed": 20.36918049999997,
+  "levelNumber": 1,
+  "remainingWireLength": 5821.7566583616,
+  "connections": [
+    {
+      "bendPoints": [],
+      "largePassages": 0,
+      "startPortIdx": 0,
+      "startSysIdx": 0,
+      "endSysIdx": 1,
+      "endPortIdx": 0
+    },
+    {
+      "bendPoints": [],
+      "largePassages": 0,
+      "startPortIdx": 1,
+      "startSysIdx": 0,
+      "endSysIdx": 4,
+      "endPortIdx": 0
+    },
+    {
+      "bendPoints": [],
+      "largePassages": 0,
+      "startPortIdx": 2,
+      "startSysIdx": 0,
+      "endSysIdx": 4,
+      "endPortIdx": 1
+    },
+    {
+      "bendPoints": [],
+      "largePassages": 0,
+      "startPortIdx": 0,
+      "startSysIdx": 1,
+      "endSysIdx": 5,
+      "endPortIdx": 0
+    },
+    {
+      "bendPoints": [],
+      "largePassages": 0,
+      "startPortIdx": 0,
+      "startSysIdx": 4,
+      "endSysIdx": 2,
+      "endPortIdx": 0
+    },
+    {
+      "bendPoints": [],
+      "largePassages": 0,
+      "startPortIdx": 1,
+      "startSysIdx": 4,
+      "endSysIdx": 3,
+      "endPortIdx": 1
+    },
+    {
+      "bendPoints": [],
+      "largePassages": 0,
+      "startPortIdx": 0,
+      "startSysIdx": 2,
+      "endSysIdx": 3,
+      "endPortIdx": 0
+    },
+    {
+      "bendPoints": [],
+      "largePassages": 0,
+      "startPortIdx": 1,
+      "startSysIdx": 2,
+      "endSysIdx": 5,
+      "endPortIdx": 1
+    },
+    {
+      "bendPoints": [],
+      "largePassages": 0,
+      "startPortIdx": 0,
+      "startSysIdx": 3,
+      "endSysIdx": 5,
+      "endPortIdx": 2
+    },
+    {
+      "bendPoints": [],
+      "largePassages": 0,
+      "startPortIdx": 1,
+      "startSysIdx": 3,
+      "endSysIdx": 5,
+      "endPortIdx": 3
+    }
+  ],
+  "packets": [
+    {
+      "x": 622.6311231201298,
+      "y": 259.3851642189345,
+      "velY": 33.09475380276481,
+      "type": "TRIANGLE",
+      "velX": 80.55403904332546,
+      "currentSize": 3
+    },
+    {
+      "x": 715.2113616033614,
+      "y": 401.6320214073158,
+      "velY": -47.87203943533436,
+      "type": "SQUARE",
+      "velX": 36.16998535114151,
+      "currentSize": 2
+    },
+    {
+      "x": 291.96309105500615,
+      "y": 429.51166963828916,
+      "velY": 62.99657441393976,
+      "type": "TRIANGLE",
+      "velX": 49.30954889378882,
+      "currentSize": 3
+    },
+    {
+      "x": 264.4100467802143,
+      "y": 222.59782021320405,
+      "velY": -11.964520617219739,
+      "type": "TRIANGLE",
+      "velX": 68.45156037972994,
+      "currentSize": 3
+    },
+    {
+      "x": 686.0757567001563,
+      "y": 460.4823987277229,
+      "velY": -65.0523777762835,
+      "type": "TRIANGLE",
+      "velX": 46.56380725039241,
+      "currentSize": 3
+    },
+    {
+      "x": 390.96713651764594,
+      "y": 415.5861638607272,
+      "velY": -26.674627463309942,
+      "type": "SQUARE",
+      "velX": 53.744434592743,
+      "currentSize": 2
+    },
+    {
+      "x": 183.5353648637251,
+      "y": 271.70715893142614,
+      "velY": 46.579596651585476,
+      "type": "SQUARE",
+      "velX": 37.81985160964552,
+      "currentSize": 2
+    }
+  ]
 }

@@ -5,6 +5,7 @@ import com.model.GameState;
 import com.utils.LevelLoader;
 import com.utils.SaveManager;
 import com.view.*;
+import javafx.animation.AnimationTimer;
 import javafx.application.Application;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -43,6 +44,8 @@ public class MainApplication extends Application {
     private SettingsController settingsControllerInstance;
     private int currentLevelNumberPlayed = 0;
     private GameState completedGameStateForGameOver;
+    private AnimationTimer autoSaveTimer;
+
 
     @Override
     public void start(Stage stage) {
@@ -50,74 +53,49 @@ public class MainApplication extends Application {
         primaryStage.setTitle("Blueprint Hell");
         primaryStage.setResizable(false);
         this.settingsControllerInstance = new SettingsController();
-
         AudioManager.loadSounds();
-        AudioManager.playMenuBackgroundMusic(true);
 
         GameState savedGame = SaveManager.loadGame();
         if (savedGame != null) {
+            Alert confirmationAlert = new Alert(Alert.AlertType.CONFIRMATION);
+            confirmationAlert.setTitle("بازیابی بازی");
+            confirmationAlert.setHeaderText("یک فایل ذخیره پیدا شد.");
+            confirmationAlert.setContentText("آیا می خواهید بازی را از نقطه ذخیره شده ادامه دهید؟");
 
-            Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION);
-            confirmation.setTitle("ادامه بازی");
-            confirmation.setHeaderText("یک بازی ذخیره شده پیدا شد.");
-            confirmation.setContentText("آیا مایلید بازی قبلی را ادامه دهید؟");
+            ButtonType yesButton = new ButtonType("بله، ادامه بده");
+            ButtonType noButton = new ButtonType("نه، بازی جدید");
+            confirmationAlert.getButtonTypes().setAll(yesButton, noButton);
 
-            ButtonType continueButton = new ButtonType("بله، ادامه بده");
-            ButtonType newGameButton = new ButtonType("نه، بازی جدید");
+            Optional<ButtonType> result = confirmationAlert.showAndWait();
 
-            confirmation.getButtonTypes().setAll(continueButton, newGameButton);
-
-            Optional<ButtonType> result = confirmation.showAndWait();
-
-            if (result.isPresent() && result.get() == continueButton) {
-
-                System.out.println("User chose to continue saved game.");
+            if (result.isPresent() && result.get() == yesButton) {
                 startGameWithLoadedState(savedGame);
                 primaryStage.show();
                 return;
             } else {
-
-                System.out.println("User chose new game. Deleting old save.");
-
+                SaveManager.deleteSaveFile();
             }
         }
 
-        MenuController menuController = new MenuController(this);
-        showMainMenu(menuController);
+        AudioManager.playMenuBackgroundMusic(true);
+        showMainMenu(new MenuController(this));
         primaryStage.show();
     }
 
     public void startGameWithLoadedState(GameState loadedGameState) {
-        this.currentLevelNumberPlayed = loadedGameState.getCurrentLevelNumber();
-        this.completedGameStateForGameOver = null;
+        System.out.println("Attempting to start game from a loaded state...");
 
-        stopCurrentGameLoop();
+        this.currentLevelNumberPlayed = loadedGameState.getCurrentLevelNumber();
+
+        stopCurrentGameAndTimers();
+
         this.gameState = loadedGameState;
 
-        double gameViewHeight = Config.WINDOW_HEIGHT - Config.HUD_HEIGHT;
-        this.gameView = new GameView(Config.WINDOW_WIDTH, gameViewHeight);
-        this.hudView = new HudView(this.gameState);
+        setupGameScene();
 
-        BorderPane rootNode = new BorderPane();
-        rootNode.setStyle("-fx-background-color: " + Config.COLOR_BACKGROUND.toString().substring(2) + ";");
-        rootNode.setTop(this.hudView);
-        rootNode.setCenter(this.gameView);
+        startGameTimers();
 
-        this.gameController = new GameController(this.gameState, this.gameView, this);
-
-        this.gameView.redrawAll(this.gameState);
-
-        this.shopControllerInstance = new ShopController(this, this.gameState, this.gameController);
-        AudioManager.playGameBackgroundMusic(true);
-        Scene gameScene = new Scene(rootNode, Config.WINDOW_WIDTH, Config.WINDOW_HEIGHT);
-        setupInputHandlers(gameScene, this.gameController, this.hudView);
-        applyStylesheet(gameScene, "/styles/style.css");
-
-        this.gameLoop = new GameLoop(this.gameController, this.gameState);
-        this.gameLoop.start();
-
-        primaryStage.setScene(gameScene);
-        System.out.println("Game started from loaded state for level " + this.currentLevelNumberPlayed);
+        System.out.println("Game started successfully from loaded state for level " + this.currentLevelNumberPlayed);
     }
 
     public GameState getGameStateForGameOver() {
@@ -213,19 +191,14 @@ public class MainApplication extends Application {
         super.stop();
     }
 
+
     public void startGame(int levelNumber) {
         this.currentLevelNumberPlayed = levelNumber;
-        this.completedGameStateForGameOver = null;
 
-        stopCurrentGameLoop();
-        this.gameState = null;
+        stopCurrentGameAndTimers();
 
         this.gameState = LevelLoader.loadLevel(levelNumber);
-
         if (this.gameState == null) {
-            System.err.println("MainApplication: Failed to load level " + levelNumber + ". Returning to main menu.");
-
-
             Alert errorAlert = new Alert(Alert.AlertType.ERROR);
             errorAlert.setTitle("خطا در بارگذاری مرحله");
             errorAlert.setHeaderText("فایل مرحله " + levelNumber + " پیدا نشد.");
@@ -235,35 +208,12 @@ public class MainApplication extends Application {
             showMainMenu(new MenuController(this));
             return;
         }
-        System.out.println("MainApplication.startGame: GameState for level " + levelNumber + " loaded. isGameRunning: " + this.gameState.isGameRunning());
 
-        double gameViewHeight = Config.WINDOW_HEIGHT - Config.HUD_HEIGHT;
-        if (gameViewHeight <= 0) {
-            System.err.println("MainApplication.startGame: Warning - gameViewHeight is invalid. Using full window height.");
-            gameViewHeight = Config.WINDOW_HEIGHT;
-        }
-        this.gameView = new GameView(Config.WINDOW_WIDTH, gameViewHeight);
-        this.hudView = new HudView(this.gameState);
+        setupGameScene();
 
-        BorderPane rootNode = new BorderPane();
-        rootNode.setStyle("-fx-background-color: " + Config.COLOR_BACKGROUND.toString().substring(2) + ";");
-        rootNode.setTop(this.hudView);
-        rootNode.setCenter(this.gameView);
+        startGameTimers();
 
-        this.gameController = new GameController(this.gameState, this.gameView, this);
-        this.gameController.initializeGame();
-
-        this.shopControllerInstance = new ShopController(this, this.gameState, this.gameController);
-        AudioManager.playGameBackgroundMusic(true);
-        Scene gameScene = new Scene(rootNode, Config.WINDOW_WIDTH, Config.WINDOW_HEIGHT);
-        setupInputHandlers(gameScene, this.gameController, this.hudView);
-        applyStylesheet(gameScene, "/styles/style.css");
-
-        this.gameLoop = new GameLoop(this.gameController, this.gameState);
-        this.gameLoop.start();
-
-        primaryStage.setScene(gameScene);
-        System.out.println("MainApplication.startGame: Game scene for level " + levelNumber + " is set. CurrentLevelPlayed: " + this.currentLevelNumberPlayed);
+        System.out.println("MainApplication: Started a new game for level " + levelNumber);
     }
 
 
@@ -515,6 +465,72 @@ public class MainApplication extends Application {
         System.out.println("MainApp.showGameOver: Game Over/Win screen shown for level " + this.currentLevelNumberPlayed);
 
     }
+
+    private void setupGameScene() {
+        double gameViewHeight = Config.WINDOW_HEIGHT - Config.HUD_HEIGHT;
+        this.gameView = new GameView(Config.WINDOW_WIDTH, gameViewHeight);
+        this.hudView = new HudView(this.gameState);
+
+        BorderPane rootNode = new BorderPane();
+        rootNode.setTop(this.hudView);
+        rootNode.setCenter(this.gameView);
+
+        this.gameController = new GameController(this.gameState, this.gameView, this);
+
+
+        if (!this.gameState.getConnections().isEmpty()) {
+            gameView.redrawAll(gameState);
+        } else {
+            gameController.initializeGame();
+        }
+
+        this.shopControllerInstance = new ShopController(this, this.gameState, this.gameController);
+        Scene gameScene = new Scene(rootNode, Config.WINDOW_WIDTH, Config.WINDOW_HEIGHT);
+        setupInputHandlers(gameScene, this.gameController, this.hudView);
+        primaryStage.setScene(gameScene);
+    }
+
+    private void startGameTimers() {
+        AudioManager.playGameBackgroundMusic(true);
+
+        this.gameLoop = new GameLoop(this.gameController, this.gameState);
+        this.gameLoop.start();
+
+        this.autoSaveTimer = new AnimationTimer() {
+            private long lastSaveTime = 0;
+            private static final long SAVE_INTERVAL_NANO = 5_000_000_000L;
+
+            @Override
+            public void handle(long now) {
+                if (lastSaveTime == 0) {
+                    lastSaveTime = now;
+                    return;
+                }
+                if (now - lastSaveTime > SAVE_INTERVAL_NANO) {
+                    if(gameState != null && gameState.isGameRunning()) {
+                        SaveManager.saveGame(gameState);
+                        lastSaveTime = now;
+                    }
+                }
+            }
+        };
+        this.autoSaveTimer.start();
+    }
+
+    private void stopCurrentGameAndTimers() {
+        if (gameLoop != null) gameLoop.stop();
+        if (autoSaveTimer != null) autoSaveTimer.stop();
+        gameLoop = null;
+        autoSaveTimer = null;
+
+        AudioManager.stopBackgroundMusic();
+
+        System.out.println("MainApplication: Cleaning up active game components...");
+        if (gameController != null) gameController = null;
+        if (hudView != null) hudView = null;
+        if (shopControllerInstance != null) shopControllerInstance = null;
+    }
+
     public Stage getPrimaryStage() { return primaryStage; }
     public GameState getGameState() { return gameState; }
 

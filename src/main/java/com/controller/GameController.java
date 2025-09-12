@@ -31,6 +31,12 @@ public class GameController {
     private Connection activeConnection = null;
     private int activeBendPointIndex = -1;
 
+    private boolean isPlacingEffect = false;
+    private EffectType effectToPlace;
+    private int effectCost;
+    private double effectDuration;
+    private boolean isMovingSystem = false;
+    private SystemNode systemToMove = null;
 
     public GameController(GameState gameState, GameView gameView, MainApplication mainApp) {
         if (gameState == null || gameView == null || mainApp == null) {
@@ -68,6 +74,7 @@ public class GameController {
 
         gameState.incrementGameTime(scaledDeltaTime);
         gameState.updateActiveSkills(scaledDeltaTime);
+        updateEffectPoints(scaledDeltaTime);
 
         if (gameState.canSpawnMorePackets() && !gameState.isLevelTimeUp()) {
             spawnNewPackets(scaledDeltaTime);
@@ -160,37 +167,60 @@ public class GameController {
         return null;
     }
 
-
     private void handlePacketMovementAndArrival(double scaledDeltaTime) {
-        if (gameState == null) return;
+        if (gameState == null) {
+            return;
+        }
 
         List<Packet> packetsToRemove = new ArrayList<>();
         List<Packet> arrivedPackets = new ArrayList<>();
 
         for (Packet packet : new ArrayList<>(gameState.getPackets())) {
-            if (packet.getCurrentSize() <= 0 || packet.update(scaledDeltaTime)) {
+            if (packet.getCurrentSize() <= 0) {
                 packetsToRemove.add(packet);
-                arrivedPackets.add(packet);
-            } else if (packet.isOffWire()) {
-
+                continue;
             }
-        }
 
-        for (Packet arrivedPacket : arrivedPackets) {
-            if(arrivedPacket.getCurrentSize() > 0){
-                Port destPort = arrivedPacket.getTargetPort();
-                if (destPort != null && destPort.getParentSystem() != null) {
-                    destPort.getParentSystem().receivePacket(arrivedPacket, gameState);
-                } else {
-                    gameState.registerCompletelyLostPacket(arrivedPacket);
+            boolean reachedEndOnWire = packet.update(scaledDeltaTime, gameState);
+
+            if (reachedEndOnWire) {
+                packetsToRemove.add(packet);
+
+                arrivedPackets.add(packet);
+            }
+            else if (packet.isOffWire()) {
+                double boundsOffset = Config.OFF_WIRE_BOUNDS_OFFSET;
+                boolean outOfBounds = packet.getX() < -boundsOffset ||
+                        packet.getX() > Config.WINDOW_WIDTH + boundsOffset ||
+                        packet.getY() < -Config.HUD_HEIGHT - boundsOffset ||
+                        packet.getY() > Config.WINDOW_HEIGHT + boundsOffset;
+
+                boolean hasStoppedForTooLong = packet.getVelocity().magnitudeSquared() < Config.MIN_VELOCITY_SQUARED_TO_STOP_OFF_WIRE &&
+                        packet.getTimeSpentIdleOffWireSeconds() >= Config.MAX_IDLE_TIME_FOR_OFF_WIRE_PACKET_SECONDS;
+
+                if (outOfBounds || hasStoppedForTooLong) {
+                    gameState.registerCompletelyLostPacket(packet);
+                    packetsToRemove.add(packet);
                 }
             }
         }
 
-        for (Packet p : packetsToRemove) {
-            boolean removed = gameState.removePacket(p);
-            if (removed) {
-                gameView.removePacketNode(p);
+        for (Packet arrivedPacket : arrivedPackets) {
+            Port destPort = arrivedPacket.getTargetPort();
+            if (destPort != null && destPort.getParentSystem() != null) {
+                destPort.getParentSystem().receivePacket(arrivedPacket, gameState);
+            } else {
+                gameState.registerCompletelyLostPacket(arrivedPacket);
+            }
+        }
+
+        if (!packetsToRemove.isEmpty()) {
+            for (Packet p : packetsToRemove) {
+                if (gameState.removePacket(p)) {
+                    if (gameView != null) {
+                        gameView.removePacketNode(p);
+                    }
+                }
             }
         }
     }
@@ -268,6 +298,46 @@ public class GameController {
     }
 
     public void handleMousePress(MouseEvent event) {
+        if (isPlacingEffect) {
+            Point2D localClick = gameView.sceneToLocal(event.getSceneX(), event.getSceneY());
+
+            if (effectToPlace == EffectType.AERGIA_NO_ACCELERATION) {
+                Connection clickedConnection = findClickedConnection(localClick.getX(), localClick.getY());
+                if (clickedConnection != null) {
+                    System.out.println("Aergia effect placed on connection " + clickedConnection.getId());
+                    gameState.decreaseCoins(effectCost);
+
+                    EffectPoint newEffect = new EffectPoint(effectToPlace, clickedConnection, localClick, effectDuration);
+                    gameState.addEffectPoint(newEffect);
+
+                    gameView.redrawAll(gameState);
+                } else {
+                    System.out.println("Aergia placement cancelled: No wire was clicked.");
+                }
+            }
+            else if (effectToPlace == EffectType.SISYPHUS_MOVE_SYSTEM) {
+                SystemNode clickedSystem = findClickedSystem(localClick.getX(), localClick.getY());
+
+                if (clickedSystem != null &&
+                        clickedSystem.getRole() != SystemRole.SOURCE &&
+                        clickedSystem.getRole() != SystemRole.SINK) {
+
+                    System.out.println("System " + clickedSystem.getRole() + " selected to be moved.");
+                    gameState.decreaseCoins(effectCost);
+
+                    this.isMovingSystem = true;
+                    this.systemToMove = clickedSystem;
+
+                } else {
+                    System.out.println("Sisyphus placement cancelled: A non-movable system (or nothing) was clicked.");
+                }
+            }
+
+            isPlacingEffect = false;
+
+            return;
+        }
+
         if (gameView == null || gameState == null || isWiring || isDraggingBendPoint) {
             return;
         }
@@ -319,24 +389,43 @@ public class GameController {
 
     public void handleMouseDrag(MouseEvent event) {
         if (gameView == null) return;
+
         Point2D localDrag = gameView.sceneToLocal(event.getSceneX(), event.getSceneY());
 
         if (isWiring && tempWire != null) {
             tempWire.setEndX(localDrag.getX());
             tempWire.setEndY(localDrag.getY());
-            Port potentialTargetPort = findClickedPort(localDrag.getX(), localDrag.getY(), PortType.INPUT);
-            double currentTempLength = new Point2D(wiringStartPort.getAbsoluteX(), wiringStartPort.getAbsoluteY()).distance(localDrag.getX(), localDrag.getY());
 
-            if (potentialTargetPort != null && !potentialTargetPort.isConnected() && isValidConnectionAttempt(wiringStartPort, potentialTargetPort) && gameState.getRemainingWireLength() >= currentTempLength) {
+            Port potentialTargetPort = findClickedPort(localDrag.getX(), localDrag.getY(), PortType.INPUT);
+            double currentTempLength = new Point2D(wiringStartPort.getAbsoluteX(), wiringStartPort.getAbsoluteY())
+                    .distance(localDrag.getX(), localDrag.getY());
+
+            if (potentialTargetPort != null &&
+                    !potentialTargetPort.isConnected() &&
+                    isValidConnectionAttempt(wiringStartPort, potentialTargetPort) &&
+                    gameState.getRemainingWireLength() >= currentTempLength)
+            {
                 tempWire.setStroke(Config.COLOR_WIRE_TEMP_VALID);
             } else {
                 tempWire.setStroke(Config.COLOR_WIRE_TEMP_INVALID);
             }
-        } else if (isDraggingBendPoint && activeConnection != null) {
+        }
+        else if (isDraggingBendPoint && activeConnection != null) {
             activeConnection.moveBendPoint(activeBendPointIndex, localDrag);
             gameView.redrawAll(gameState);
         }
+        else if (isMovingSystem && systemToMove != null) {
+
+
+            double newX = localDrag.getX() - (systemToMove.getWidth() / 2);
+            double newY = localDrag.getY() - (systemToMove.getHeight() / 2);
+
+            systemToMove.setPosition(newX, newY);
+
+            gameView.redrawAll(gameState);
+        }
     }
+
 
 
     public void handleMouseRelease(MouseEvent event) {
@@ -360,8 +449,10 @@ public class GameController {
         }
 
         else if (isDraggingBendPoint) {
-
             System.out.println("Finished dragging bend point.");
+        }
+        else if (isMovingSystem) {
+            System.out.println("System move finished.");
         }
 
 
@@ -376,14 +467,18 @@ public class GameController {
         activeConnection = null;
         activeBendPointIndex = -1;
 
-        if (gameState != null) {
-            for (SystemNode system : gameState.getSystems()) {
-                system.updateAllPortsActuallyConnectedState();
-            }
-        }
+        isMovingSystem = false;
+        systemToMove = null;
+
+        isPlacingEffect = false;
+
 
         if (gameView != null && gameState != null) {
             gameView.redrawAll(gameState);
+
+            for (SystemNode system : gameState.getSystems()) {
+                system.updateAllPortsActuallyConnectedState();
+            }
             checkAndSetAllPortsConnected();
         }
     }
@@ -558,6 +653,49 @@ public class GameController {
                 gameState.removeConnection(connToRemove);
             }
 
+            gameView.redrawAll(gameState);
+        }
+    }
+
+    private SystemNode findClickedSystem(double x, double y) {
+        for (SystemNode system : gameState.getSystems()) {
+            if (x >= system.getX() && x <= system.getX() + system.getWidth() &&
+                    y >= system.getY() && y <= system.getY() + system.getHeight()) {
+                return system;
+            }
+        }
+        return null;
+    }
+
+    public void startEffectPlacement(EffectType type, int cost, double duration) {
+        this.isPlacingEffect = true;
+        this.effectToPlace = type;
+        this.effectCost = cost;
+        this.effectDuration = duration;
+
+
+        if (type == EffectType.AERGIA_NO_ACCELERATION) {
+            System.out.println("Now click on a wire to place the Aergia effect.");
+        } else if (type == EffectType.SISYPHUS_MOVE_SYSTEM) {
+            System.out.println("Now click on an INTERMEDIATE system to move it.");
+        } else if (type == EffectType.ELIPHAS_CENTERING_FORCE) {
+            System.out.println("Now click on a wire to place the Eliphas effect.");
+        }
+    }
+
+    private void updateEffectPoints(double scaledDeltaTime) {
+        var iterator = gameState.getEffectPoints().iterator();
+        boolean needsRedraw = false;
+        while (iterator.hasNext()) {
+            EffectPoint effect = iterator.next();
+            if (effect.update(scaledDeltaTime)) {
+                iterator.remove();
+                needsRedraw = true;
+                System.out.println("Effect " + effect.getType() + " has expired.");
+            }
+        }
+
+        if (needsRedraw) {
             gameView.redrawAll(gameState);
         }
     }

@@ -2,6 +2,7 @@ package com.view;
 
 import com.blueprinthell.Config;
 import com.controller.ShopController;
+import com.model.EffectType;
 import com.model.GameState;
 import com.model.ShopSkill;
 import javafx.beans.property.BooleanProperty;
@@ -88,6 +89,26 @@ public class ShopView extends BorderPane {
                 null
         ));
 
+        skillsContainer.getChildren().add(createSkillEntryView(
+                "Scroll of Aergia",
+                "با انتخاب نقطه‌ای روی سیم، شتاب پکت‌های عبوری را برای ۲۰ ثانیه صفر می‌کند.",
+                10,
+                () -> shopController.enterPlacementMode(EffectType.AERGIA_NO_ACCELERATION, 10, 20.0)
+        ));
+
+        skillsContainer.getChildren().add(createSkillEntryView(
+                "Scroll of Sisyphus",
+                "به شما اجازه می‌دهد یک سیستم میانی (غیر از Source و Sink) را انتخاب و جابجا کنید.",
+                15,
+                () -> shopController.enterPlacementMode(EffectType.SISYPHUS_MOVE_SYSTEM, 15, 0)
+        ));
+
+        skillsContainer.getChildren().add(createSkillEntryView(
+                "Scroll of Eliphas",
+                "با انتخاب نقطه‌ای روی سیم، برای ۳۰ ثانیه تمام پکت‌های عبوری را به مرکز سیم بازمی‌گرداند.",
+                20,
+                () -> shopController.enterPlacementMode(EffectType.ELIPHAS_CENTERING_FORCE, 20, 30.0)
+        ));
 
         Button closeButton = new Button("بستن فروشگاه (ESC)");
         styleButton(closeButton);
@@ -145,6 +166,44 @@ public class ShopView extends BorderPane {
             skillBox.getChildren().add(activeStatusLabel);
         }
 
+        return skillBox;
+    }
+
+    private VBox createSkillEntryView(String name, String description, int cost, Runnable buyAction) {
+        VBox skillBox = new VBox(5);
+        skillBox.setPadding(new Insets(10));
+        skillBox.setAlignment(Pos.CENTER_LEFT);
+        skillBox.setStyle("-fx-background-color: " + formatColorToCss(Config.COLOR_SHOP_BUTTON.deriveColor(0,1,1,0.3)) +";" +
+                "-fx-border-color: " + formatColorToCss(Config.COLOR_SHOP_BUTTON) + "; -fx-border-width: 1; -fx-border-radius: 4;");
+
+        Label nameLabel = new Label(name);
+        nameLabel.setFont(Font.font("Arial", FontWeight.BOLD, 16));
+        nameLabel.setTextFill(Config.COLOR_SHOP_TEXT);
+
+        Label costLabel = new Label("قیمت: " + cost + " سکه");
+        costLabel.setFont(Font.font("Arial", FontWeight.NORMAL, 13));
+        costLabel.setTextFill(Config.COLOR_SHOP_TEXT);
+
+        Label descLabel = new Label(description);
+        descLabel.setFont(Font.font("Arial", FontWeight.NORMAL, 12));
+        descLabel.setTextFill(Config.COLOR_SHOP_TEXT);
+        descLabel.setWrapText(true);
+        descLabel.setMaxWidth(Config.SHOP_VIEW_DEFAULT_WIDTH - 60);
+
+        Button buyButton = new Button("خرید");
+        styleButton(buyButton);
+
+        buyButton.setOnAction(e -> {
+            System.out.println("ShopView: Buy action button clicked for " + name);
+            buyAction.run();
+        });
+
+
+        buyButton.disableProperty().bind(
+                gameState.coinsProperty().lessThan(cost)
+        );
+
+        skillBox.getChildren().addAll(nameLabel, costLabel, descLabel, buyButton);
         return skillBox;
     }
 

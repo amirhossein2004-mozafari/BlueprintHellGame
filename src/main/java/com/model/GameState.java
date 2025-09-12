@@ -43,6 +43,8 @@ public class GameState {
     private final int packetsToSpawnInLevel_value;
     private final ReadOnlyIntegerWrapper packetsToSpawnInLevelPropertyWrapper;
 
+    private final List<EffectPoint> effectPoints = new ArrayList<>();
+
     public GameState(int levelNumber, int packetsToSpawnInLevel, double levelDurationSeconds) {
         this.packetsToSpawnInLevel_value = packetsToSpawnInLevel;
         this.packetsToSpawnInLevelPropertyWrapper = new ReadOnlyIntegerWrapper(packetsToSpawnInLevel);
@@ -281,6 +283,15 @@ public class GameState {
             return true;
         }
         return false;
+    }
+
+    public List<EffectPoint> getEffectPoints() {
+        return effectPoints;
+    }
+    public void addEffectPoint(EffectPoint effectPoint) {
+        if (effectPoint != null) {
+            this.effectPoints.add(effectPoint);
+        }
     }
 
     public void setGameTimeElapsed(double time) {

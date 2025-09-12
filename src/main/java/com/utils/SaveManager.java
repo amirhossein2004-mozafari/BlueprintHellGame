@@ -10,87 +10,20 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
-import java.util.ArrayList;
-
 
 public class SaveManager {
 
     private static final String SAVE_FILE_PATH = "gameState.json";
 
 
-    public static JSONObject gameStateToJson(GameState gameState) {
-        JSONObject saveJson = new JSONObject();
-
-
-        saveJson.put("levelNumber", gameState.getCurrentLevelNumber());
-        saveJson.put("gameTimeElapsed", gameState.getGameTimeElapsedSeconds());
-
-
-        saveJson.put("coins", gameState.getCoins());
-        saveJson.put("remainingWireLength", gameState.getRemainingWireLength());
-
-        JSONArray systemsArray = new JSONArray();
-        for (int i = 0; i < gameState.getSystems().size(); i++) {
-            SystemNode system = gameState.getSystems().get(i);
-            JSONObject systemJson = new JSONObject();
-            systemJson.put("id", i);
-            systemJson.put("role", system.getRole().toString());
-            systemJson.put("x", system.getX());
-            systemJson.put("y", system.getY());
-            systemsArray.put(systemJson);
-        }
-        saveJson.put("systems", systemsArray);
-
-
-        JSONArray connectionsArray = new JSONArray();
-        for (Connection conn : gameState.getConnections()) {
-            JSONObject connJson = new JSONObject();
-
-            connJson.put("startSystemIndex", gameState.getSystems().indexOf(conn.getStartPort().getParentSystem()));
-            connJson.put("startPortIndex", conn.getStartPort().getParentSystem().getOutputPorts().indexOf(conn.getStartPort()));
-            connJson.put("endSystemIndex", gameState.getSystems().indexOf(conn.getEndPort().getParentSystem()));
-            connJson.put("endPortIndex", conn.getEndPort().getParentSystem().getInputPorts().indexOf(conn.getEndPort()));
-
-            JSONArray bendPointsArray = new JSONArray();
-            for (Point2D point : conn.getBendPoints()) {
-                JSONObject pointJson = new JSONObject();
-                pointJson.put("x", point.getX());
-                pointJson.put("y", point.getY());
-                bendPointsArray.put(pointJson);
-            }
-            connJson.put("bendPoints", bendPointsArray);
-            connectionsArray.put(connJson);
-        }
-        saveJson.put("connections", connectionsArray);
-
-        JSONArray packetsArray = new JSONArray();
-        for (Packet packet : gameState.getPackets()) {
-            JSONObject packetJson = new JSONObject();
-            packetJson.put("type", packet.getType().toString());
-            packetJson.put("x", packet.getX());
-            packetJson.put("y", packet.getY());
-            packetJson.put("velocityX", packet.getVelocity().getX());
-            packetJson.put("velocityY", packet.getVelocity().getY());
-            packetJson.put("currentSize", packet.getCurrentSize());
-            packetJson.put("noiseLevel", packet.getNoiseLevel());
-            packetsArray.put(packetJson);
-        }
-        saveJson.put("packets", packetsArray);
-
-        return saveJson;
-    }
-
-
     public static void saveGame(GameState gameState) {
-        if (gameState == null) {
-            System.err.println("SaveManager: GameState is null, cannot save.");
+        if (gameState == null || !gameState.isGameRunning()) {
+            System.out.println("SaveManager: Save condition not met (game not running or state is null).");
             return;
         }
-
         JSONObject saveJson = gameStateToJson(gameState);
-
         try (FileWriter file = new FileWriter(SAVE_FILE_PATH)) {
-            file.write(saveJson.toString(4));
+            file.write(saveJson.toString(2));
             System.out.println("Game state saved successfully to " + SAVE_FILE_PATH);
         } catch (IOException e) {
             System.err.println("Error saving game state to file: " + e.getMessage());
@@ -99,91 +32,123 @@ public class SaveManager {
     }
 
 
+    private static JSONObject gameStateToJson(GameState gameState) {
+        JSONObject json = new JSONObject();
+        json.put("levelNumber", gameState.getCurrentLevelNumber());
+        json.put("gameTimeElapsed", gameState.getGameTimeElapsedSeconds());
+        json.put("coins", gameState.getCoins());
+        json.put("remainingWireLength", gameState.getRemainingWireLength());
+
+        JSONArray systemsArray = new JSONArray();
+        gameState.getSystems().forEach(system -> {
+            JSONObject sysJson = new JSONObject();
+            sysJson.put("role", system.getRole().toString());
+            sysJson.put("x", system.getX());
+            sysJson.put("y", system.getY());
+            systemsArray.put(sysJson);
+        });
+        json.put("systems", systemsArray);
+
+        JSONArray connsArray = new JSONArray();
+        for (Connection conn : gameState.getConnections()) {
+            JSONObject connJson = new JSONObject();
+            connJson.put("startSysIdx", gameState.getSystems().indexOf(conn.getStartPort().getParentSystem()));
+            connJson.put("startPortIdx", conn.getStartPort().getParentSystem().getOutputPorts().indexOf(conn.getStartPort()));
+            connJson.put("endSysIdx", gameState.getSystems().indexOf(conn.getEndPort().getParentSystem()));
+            connJson.put("endPortIdx", conn.getEndPort().getParentSystem().getInputPorts().indexOf(conn.getEndPort()));
+            connJson.put("largePassages", conn.getLargePacketPassages());
+
+            JSONArray bends = new JSONArray();
+            conn.getBendPoints().forEach(p -> bends.put(new JSONObject().put("x", p.getX()).put("y", p.getY())));
+            connJson.put("bendPoints", bends);
+            connsArray.put(connJson);
+        }
+        json.put("connections", connsArray);
+
+        JSONArray packetsArray = new JSONArray();
+        gameState.getPackets().forEach(packet -> {
+            JSONObject pJson = new JSONObject();
+            pJson.put("type", packet.getType().toString());
+            pJson.put("x", packet.getX());
+            pJson.put("y", packet.getY());
+            pJson.put("velX", packet.getVelocity().getX());
+            pJson.put("velY", packet.getVelocity().getY());
+            pJson.put("currentSize", packet.getCurrentSize());
+            packetsArray.put(pJson);
+        });
+        json.put("packets", packetsArray);
+
+        return json;
+    }
+
+
     public static GameState loadGame() {
-        try {
-            if (!Files.exists(Paths.get(SAVE_FILE_PATH))) {
-                System.out.println("SaveManager: No save file found.");
-                return null;
-            }
-
-            String jsonContent = new String(Files.readAllBytes(Paths.get(SAVE_FILE_PATH)));
-            JSONObject saveJson = new JSONObject(jsonContent);
-
-            return jsonToGameState(saveJson);
-
-        } catch (IOException e) {
-            System.err.println("Error reading save file: " + e.getMessage());
-            e.printStackTrace();
+        if (!Files.exists(Paths.get(SAVE_FILE_PATH))) {
             return null;
+        }
+        try {
+            String content = new String(Files.readAllBytes(Paths.get(SAVE_FILE_PATH)));
+            if (content.trim().isEmpty()) return null;
+
+            JSONObject json = new JSONObject(content);
+            return jsonToGameState(json);
         } catch (Exception e) {
-            System.err.println("Error parsing save file JSON: " + e.getMessage());
+            System.err.println("Failed to load game from file.");
             e.printStackTrace();
             return null;
         }
     }
 
-    private static GameState jsonToGameState(JSONObject saveJson) {
+    private static GameState jsonToGameState(JSONObject json) {
+        int levelNumber = json.getInt("levelNumber");
+        GameState gameState = LevelLoader.loadLevel(levelNumber);
 
-        int levelNumber = saveJson.getInt("levelNumber");
-        GameState gameState = new GameState(levelNumber, 0, 0);
+        gameState.clearConnections();
+        gameState.clearPackets();
 
+        gameState.setGameTimeElapsed(json.getDouble("gameTimeElapsed"));
+        gameState.coinsProperty().set(json.getInt("coins"));
+        gameState.remainingWireLengthProperty().set(json.getDouble("remainingWireLength"));
 
-        gameState.setGameTimeElapsed(saveJson.getDouble("gameTimeElapsed"));
-        gameState.coinsProperty().set(saveJson.getInt("coins"));
-        gameState.remainingWireLengthProperty().set(saveJson.getDouble("remainingWireLength"));
+        List<SystemNode> systems = gameState.getSystems();
+        JSONArray connsArray = json.getJSONArray("connections");
+        for (int i = 0; i < connsArray.length(); i++) {
+            JSONObject cJson = connsArray.getJSONObject(i);
+            Port startPort = systems.get(cJson.getInt("startSysIdx")).getOutputPorts().get(cJson.getInt("startPortIdx"));
+            Port endPort = systems.get(cJson.getInt("endSysIdx")).getInputPorts().get(cJson.getInt("endPortIdx"));
+            Connection conn = new Connection(startPort, endPort);
 
+            cJson.getJSONArray("bendPoints").forEach(p -> {
+                JSONObject pJson = (JSONObject) p;
+                conn.addBendPoint(new Point2D(pJson.getDouble("x"), pJson.getDouble("y")));
+            });
 
-        JSONArray systemsArray = saveJson.getJSONArray("systems");
-        List<SystemNode> loadedSystems = new ArrayList<>();
-        for (int i = 0; i < systemsArray.length(); i++) {
-            JSONObject systemJson = systemsArray.getJSONObject(i);
-            double x = systemJson.getDouble("x");
-            double y = systemJson.getDouble("y");
-            SystemRole role = SystemRole.valueOf(systemJson.getString("role"));
+            for(int k=0; k < cJson.optInt("largePassages", 0); k++) conn.registerLargePacketPassage();
 
-            SystemNode system = new SystemNode(x, y, role);
-            loadedSystems.add(system);
-            gameState.addSystem(system);
+            gameState.addConnection(conn);
         }
 
+        JSONArray packetsArray = json.getJSONArray("packets");
+        packetsArray.forEach(p -> {
+            JSONObject pJson = (JSONObject) p;
+            Packet packet = new Packet(PacketType.valueOf(pJson.getString("type")), pJson.getDouble("x"), pJson.getDouble("y"));
+            packet.getVelocity().set(pJson.getDouble("velX"), pJson.getDouble("velY"));
+            packet.setCurrentSize(pJson.getInt("currentSize"));
+            gameState.addPacket(packet);
+        });
 
-        JSONArray connectionsArray = saveJson.getJSONArray("connections");
-        for (int i = 0; i < connectionsArray.length(); i++) {
-            JSONObject connJson = connectionsArray.getJSONObject(i);
-            SystemNode startSystem = loadedSystems.get(connJson.getInt("startSystemIndex"));
-            Port startPort = startSystem.getOutputPorts().get(connJson.getInt("startPortIndex"));
-
-            SystemNode endSystem = loadedSystems.get(connJson.getInt("endSystemIndex"));
-            Port endPort = endSystem.getInputPorts().get(connJson.getInt("endPortIndex"));
-
-            Connection newConn = new Connection(startPort, endPort);
-
-            JSONArray bendPointsArray = connJson.getJSONArray("bendPoints");
-            for (int j = 0; j < bendPointsArray.length(); j++) {
-                JSONObject pointJson = bendPointsArray.getJSONObject(j);
-                newConn.addBendPoint(new Point2D(pointJson.getDouble("x"), pointJson.getDouble("y")));
-            }
-            gameState.addConnection(newConn);
-        }
-
-
-        JSONArray packetsArray = saveJson.getJSONArray("packets");
-        for (int i = 0; i < packetsArray.length(); i++) {
-            JSONObject packetJson = packetsArray.getJSONObject(i);
-            PacketType type = PacketType.valueOf(packetJson.getString("type"));
-            double x = packetJson.getDouble("x");
-            double y = packetJson.getDouble("y");
-
-            Packet newPacket = new Packet(type, x, y);
-            newPacket.getVelocity().set(packetJson.getDouble("velocityX"), packetJson.getDouble("velocityY"));
-            newPacket.setCurrentSize(packetJson.getInt("currentSize"));
-            newPacket.setNoiseLevel(packetJson.getDouble("noiseLevel"));
-
-            gameState.addPacket(newPacket);
-        }
-
-        System.out.println("Game state loaded successfully!");
+        System.out.println("GameState successfully reconstructed from file.");
         return gameState;
     }
 
+
+    public static void deleteSaveFile() {
+        try {
+            Files.deleteIfExists(Paths.get(SAVE_FILE_PATH));
+            System.out.println("Save file successfully deleted.");
+        } catch (IOException e) {
+            System.err.println("Could not delete save file.");
+            e.printStackTrace();
+        }
+    }
 }
