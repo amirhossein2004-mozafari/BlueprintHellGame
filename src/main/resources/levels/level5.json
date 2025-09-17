@@ -1,13 +1,60 @@
 {
   "levelNumber": 5,
-  "packetsToSpawn": 25,
-  "levelDurationSeconds": 180.0,
-  "initialWireLength": 8000.0,
+  "packetsToSpawn": 70,
+  "levelDurationSeconds": 360.0,
+  "initialWireLength": 9000.0,
   "systems": [
-    { "x": 100, "y": 300, "role": "SOURCE", "ports": { "squareOutputs": 1 }},
-    { "x": 350, "y": 150, "role": "SPY", "ports": { "squareInputs": 1, "squareOutputs": 1 }},
-    { "x": 350, "y": 450, "role": "SPY", "ports": { "squareInputs": 1, "squareOutputs": 1 }},
-    { "x": 700, "y": 150, "role": "SINK", "ports": { "squareInputs": 1 }},
-    { "x": 700, "y": 450, "role": "SINK", "ports": { "squareInputs": 1 }}
+    {
+      "x": 40, "y": 300, "role": "SOURCE",
+      "ports": { "largeOutputs": 1, "triangleOutputs": 1, "messengerOutputs": 1 }
+    },
+    {
+      "x": 960, "y": 300, "role": "SINK",
+      "ports": { "largeInputs": 1, "triangleInputs": 1, "messengerInputs": 1 }
+    },
+    {
+      "x": 200, "y": 300, "role": "DISTRIBUTE",
+      "comment": "شروع مسیر پکت حجیم",
+      "ports": { "largeInputs": 1, "squareOutputs": 2, "triangleOutputs": 2 }
+    },
+    {
+      "x": 800, "y": 300, "role": "MERGE",
+      "comment": "پایان مسیر پکت حجیم",
+      "ports": { "squareInputs": 2, "triangleInputs": 2, "largeOutputs": 1 }
+    },
+    {
+      "x": 400, "y": 100, "role": "SABOTEUR",
+      "comment": "مسیر پرخطر بالایی",
+      "ports": { "squareInputs": 1, "triangleInputs": 1, "squareOutputs": 1, "triangleOutputs": 1 }
+    },
+    {
+      "x": 600, "y": 100, "role": "INTERMEDIATE",
+      "comment": "ادامه مسیر پرخطر",
+      "ports": { "squareInputs": 1, "triangleInputs": 1, "squareOutputs": 1, "triangleOutputs": 1 }
+    },
+    {
+      "x": 500, "y": 300, "role": "ANTI_TROJAN",
+      "comment": "منطقه امن برای خنثی کردن تروجان‌ها"
+    },
+    {
+      "x": 400, "y": 500, "role": "VPN",
+      "comment": "مسیر امن پایینی",
+      "ports": { "squareInputs": 1, "triangleInputs": 1, "squareOutputs": 1, "triangleOutputs": 1 }
+    },
+    {
+      "x": 600, "y": 500, "role": "INTERMEDIATE",
+      "comment": "ادامه مسیر امن",
+      "ports": { "squareInputs": 1, "triangleInputs": 1, "squareOutputs": 1, "triangleOutputs": 1 }
+    },
+    {
+      "x": 150, "y": 550, "role": "SPY",
+      "comment": "جاسوس ۱: ورودی میان‌بر",
+      "ports": { "messengerInputs": 1 }
+    },
+    {
+      "x": 850, "y": 50, "role": "SPY",
+      "comment": "جاسوس ۲: خروجی میان‌بر",
+      "ports": { "messengerOutputs": 1 }
+    }
   ]
 }

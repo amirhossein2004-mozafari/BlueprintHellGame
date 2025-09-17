@@ -27,6 +27,10 @@ public class Port {
         this.connectedConnection = connection;
     }
 
+    public boolean isLargePortType() {
+        return this.packetType == PacketType.LARGE;
+    }
+
     public boolean isConnected() {
         return connectedConnection != null;
     }

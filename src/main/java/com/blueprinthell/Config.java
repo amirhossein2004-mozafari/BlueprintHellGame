@@ -74,6 +74,7 @@ public final class Config {
 
     public static final int PACKET_SQUARE_INITIAL_SIZE = 2;
     public static final int PACKET_TRIANGLE_INITIAL_SIZE = 3;
+    public static final int PACKET_MESSENGER_INITIAL_SIZE = 1;
     public static final double STABILITY_THRESHOLD_FOR_SPEED_REDUCTION = 0.6;
 
     public static final double MIN_INITIAL_SPEED_FACTOR = 0.15;

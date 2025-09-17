@@ -196,6 +196,23 @@ public class GameView extends Pane {
             trianglePort.getPoints().addAll(x1, y1, x2, y2, x3, y3);
             trianglePort.setFill(Config.COLOR_PORT_TRIANGLE);
             return trianglePort;
+        } else if (port.getPacketType() == PacketType.LARGE) {
+            size = Config.PORT_BASE_SIZE_UNIT * 2.5; // Larger size for LARGE ports
+            Rectangle largePortShape = new Rectangle(cx - size, cy - size, size * 2, size * 2);
+            largePortShape.setFill(Color.MAGENTA); // Magenta color
+            return largePortShape;
+        } else if (port.getPacketType() == PacketType.MESSENGER_INFINITY) {
+            // *** CHANGE START: Using a Path to create the infinity symbol for the port ***
+            size = Config.PORT_BASE_SIZE_UNIT * 1.5;
+            Path path = new Path();
+            path.getElements().add(new MoveTo(cx - size, cy));
+            path.getElements().add(new CubicCurveTo(cx - size, cy - size, cx + size, cy + size, cx + size, cy));
+            path.getElements().add(new CubicCurveTo(cx + size, cy - size, cx - size, cy + size, cx - size, cy));
+            path.setFill(Color.LIGHTGRAY); // A light color for the port
+            path.setStroke(Color.WHITE);
+            path.setStrokeWidth(0.5);
+            return path;
+            // *** CHANGE END ***
         } else {
             return new Circle(cx, cy, Config.PORT_BASE_SIZE_UNIT * 0.5, Color.GRAY);
         }
@@ -279,12 +296,15 @@ public class GameView extends Pane {
             node.setFill(Color.CRIMSON);
             node.setStroke(Color.WHITE);
         } else if (packet.getType() == PacketType.MESSENGER_INFINITY) {
-            size = 10;
-            Rectangle rect1 = new Rectangle(x - size / 2, y - size / 6, size, size / 3);
-            Rectangle rect2 = new Rectangle(x - size / 6, y - size / 2, size / 3, size);
-            node = Shape.union(rect1, rect2);
-            node.setFill(Color.LIGHTCORAL);
-            node.setStroke(Color.WHITE);
+            // *** CHANGE START: Using a Path to create the infinity symbol for the packet ***
+            size = Config.PORT_BASE_SIZE_UNIT * 1.8;
+            Path path = new Path();
+            path.getElements().add(new MoveTo(x - size, y));
+            path.getElements().add(new CubicCurveTo(x - size, y - size, x + size, y + size, x + size, y));
+            path.getElements().add(new CubicCurveTo(x + size, y - size, x - size, y + size, x - size, y));
+            node = path;
+            node.setFill(Color.WHITE); // White color as requested
+            // *** CHANGE END ***
         } else if (packet.getType() == PacketType.LARGE) {
             size = 12;
             Rectangle rect = new Rectangle(x - size/2, y - size/2, size, size);

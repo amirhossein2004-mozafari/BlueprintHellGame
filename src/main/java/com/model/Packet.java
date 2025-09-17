@@ -37,6 +37,9 @@ public class Packet {
     private int currentSegmentIndex;
     private String parentLargePacketId = null;
     private int totalBitsForParent = 0;
+    private boolean isReturningToSource = false;
+    private Port originalSourcePort = null;
+    private transient SystemNode lastVisitedSystem;
 
 
     public Packet(PacketType type, double initialX, double initialY) {
@@ -55,6 +58,8 @@ public class Packet {
             this.initialSize = 8;
         } else if (type == PacketType.LARGE_10) {
             this.initialSize = 10;
+        } else if (type == PacketType.MESSENGER_INFINITY) {
+            this.initialSize = Config.PACKET_MESSENGER_INITIAL_SIZE;
         }
         else {
             this.initialSize = Config.PACKET_TRIANGLE_INITIAL_SIZE;
@@ -123,6 +128,19 @@ public class Packet {
             this.currentMaxSpeedOnWire = Config.BASE_PACKET_SPEED * (compatibleStart ? Config.TRIANGLE_COMPATIBLE_SPEED_FACTOR : Config.TRIANGLE_INCOMPATIBLE_MAX_SPEED_FACTOR);
             this.acceleration = compatibleStart ? 0 : Config.TRIANGLE_PACKET_ACCELERATION;
             initialSpeedFactor = compatibleStart ? Config.TRIANGLE_COMPATIBLE_INITIAL_SPEED_FACTOR : Config.TRIANGLE_INCOMPATIBLE_INITIAL_SPEED_FACTOR;
+        } else if (this.type == PacketType.MESSENGER_INFINITY) {
+            boolean isCompatibleStart = (this.startPort.getPacketType() == this.type ||
+                    this.startPort.getPacketType() == PacketType.SQUARE || // Assume it's compatible with basic types for simplicity
+                    this.startPort.getPacketType() == PacketType.TRIANGLE);
+
+            // This packet has constant acceleration from a compatible port
+            this.acceleration = isCompatibleStart ? Config.TRIANGLE_PACKET_ACCELERATION : -Config.TRIANGLE_PACKET_ACCELERATION;
+            this.currentMaxSpeedOnWire = Config.BASE_PACKET_SPEED * 1.2; // A bit faster max speed
+            initialSpeedFactor = 0.5; // Starts slower and accelerates
+
+            // This packet is not returning at the start
+            this.isReturningToSource = false;
+            this.originalSourcePort = this.startPort; // Remember its origin
         } else {
 
             this.currentMaxSpeedOnWire = Config.BASE_PACKET_SPEED;
@@ -192,6 +210,20 @@ public class Packet {
             currentSegmentIndex++;
 
             if (currentSegmentIndex >= path.size() - 1) {
+                if (this.isReturningToSource && this.type == PacketType.MESSENGER_INFINITY) {
+                    System.out.println("Messenger packet has returned to source. Re-launching towards original destination.");
+
+                    Port temp = this.startPort;
+                    this.startPort = this.targetPort;
+                    this.targetPort = temp;
+                    this.isReturningToSource = false;
+                    this.currentSegmentIndex = 0;
+
+                    this.velocity.multiply(-1);
+
+                    return false;
+                }
+
                 if (this.isLargePacket()) {
                     this.currentConnection.registerLargePacketPassage();
                     System.out.println("LARGE packet passed wire. Passages: " + this.currentConnection.getLargePacketPassages());
@@ -272,6 +304,25 @@ public class Packet {
         }
 
         return false;
+    }
+
+    // In Packet.java
+    public void handleCollision() {
+        // The specific behavior for MESSENGER_INFINITY packet on collision
+        if (this.type == PacketType.MESSENGER_INFINITY && !this.isReturningToSource) {
+            System.out.println("Messenger packet collided! Returning to source.");
+            this.isReturningToSource = true;
+
+            // Reverse direction and target
+            Port temp = this.startPort;
+            this.startPort = this.targetPort;
+            this.targetPort = temp;
+
+            this.velocity.multiply(-1); // Reverse velocity
+
+            // We need to re-evaluate the path, which means resetting the segment index
+            this.currentSegmentIndex = 0; // Go to the beginning of the (now reversed) path
+        }
     }
 
     private String getPacketIdSafe() {
@@ -369,6 +420,14 @@ public class Packet {
         double labelOffsetY = -15;
         this.sizeLabel.setLayoutX(this.x + labelOffsetX);
         this.sizeLabel.setLayoutY(this.y + labelOffsetY);
+    }
+
+    public SystemNode getLastVisitedSystem() {
+        return lastVisitedSystem;
+    }
+
+    public void setLastVisitedSystem(SystemNode system) {
+        this.lastVisitedSystem = system;
     }
 
     public int getCurrentSegmentIndex() {

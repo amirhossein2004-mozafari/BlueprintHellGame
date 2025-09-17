@@ -42,27 +42,19 @@ public class LevelSelectionView extends VBox {
         level2Button.setOnAction(e -> mainApp.startGame(2));
         levelsGrid.add(level2Button, 1, 0);
 
-        Button level3Button = createLevelButton("مرحله ۳ (VPN)");
+        Button level3Button = createLevelButton("مرحله ۳ ");
         level3Button.setOnAction(e -> mainApp.startGame(3));
         levelsGrid.add(level3Button, 2, 0);
 
 
-        Button level4Button = createLevelButton("مرحله ۴ (خرابکار)");
+        Button level4Button = createLevelButton("مرحله ۴ ");
         level4Button.setOnAction(e -> mainApp.startGame(4));
         levelsGrid.add(level4Button, 0, 1);
 
-        Button level5Button = createLevelButton("مرحله ۵ (جاسوس)");
+        Button level5Button = createLevelButton("مرحله ۵ ");
         level5Button.setOnAction(e -> mainApp.startGame(5));
         levelsGrid.add(level5Button, 1, 1);
 
-        Button level6Button = createLevelButton("مرحله ۶ (تروجان)");
-        level6Button.setOnAction(e -> mainApp.startGame(6));
-        levelsGrid.add(level6Button, 2, 1);
-
-
-        Button level8Button = createLevelButton("مرحله ۸ (توزیع)");
-        level8Button.setOnAction(e -> mainApp.startGame(8));
-        levelsGrid.add(level8Button, 0, 2);
 
         Button backButton = new Button("بازگشت به منوی اصلی");
         backButton.setPrefWidth(250);

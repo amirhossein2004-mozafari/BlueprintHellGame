@@ -60,6 +60,9 @@ public class CollisionDetector {
                     if (sepForceDirP1.magnitudeSquared() > 0.001) packet1.applyImpactForce(Vector2D.multiply(sepForceDirP1, sepForceMag));
                     if (sepForceDirP2.magnitudeSquared() > 0.001) packet2.applyImpactForce(Vector2D.multiply(sepForceDirP2, sepForceMag));
 
+                    packet1.handleCollision();
+                    packet2.handleCollision();
+
                     if (!gameState.isSkillActive(ShopSkill.ATAR)) {
                         double colX = (packet1.getX() + packet2.getX()) / 2.0;
                         double colY = (packet1.getY() + packet2.getY()) / 2.0;

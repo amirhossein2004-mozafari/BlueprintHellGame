@@ -37,6 +37,8 @@ public class GameController {
     private double effectDuration;
     private boolean isMovingSystem = false;
     private SystemNode systemToMove = null;
+    private boolean testPacketsSpawned = false;
+    private boolean collisionTestPacketsSpawned = false;
 
     public GameController(GameState gameState, GameView gameView, MainApplication mainApp) {
         if (gameState == null || gameView == null || mainApp == null) {
@@ -48,6 +50,7 @@ public class GameController {
     }
 
     public void initializeGame() {
+        this.testPacketsSpawned = false;
         gameState.clearPackets();
         gameState.clearConnections();
 
@@ -68,11 +71,13 @@ public class GameController {
         if (gameState == null || mainApp == null) {
             return;
         }
+
+        gameState.incrementGameTime(scaledDeltaTime);
+
         if (gameState.isGameLogicPaused() || !gameState.isGameRunning()) {
             return;
         }
 
-        gameState.incrementGameTime(scaledDeltaTime);
         gameState.updateActiveSkills(scaledDeltaTime);
         updateEffectPoints(scaledDeltaTime);
 
@@ -95,46 +100,51 @@ public class GameController {
         checkEndConditions();
     }
 
-
     private void spawnNewPackets(double scaledDeltaTime) {
         if (gameState == null) return;
 
         timeSinceLastPacket += scaledDeltaTime;
+        if (timeSinceLastPacket < Config.PACKET_SPAWN_INTERVAL) {
+            return;
+        }
+        timeSinceLastPacket = 0;
 
-        if (timeSinceLastPacket >= Config.PACKET_SPAWN_INTERVAL) {
-            timeSinceLastPacket = 0.0;
+        if (!gameState.canSpawnMorePackets() || gameState.getPackets().size() >= Config.MAX_ACTIVE_PACKETS) {
+            return;
+        }
 
-            if (gameState.canSpawnMorePackets() && !gameState.isLevelTimeUp()) {
-                if (gameState.getPackets().size() < Config.MAX_ACTIVE_PACKETS) {
-                    SystemNode sourceSystem = findRandomSourceSystem(gameState);
-                    System.out.println("GC.Spawn: MAX_ACTIVE_PACKETS (" + Config.MAX_ACTIVE_PACKETS + ") reached. Cannot spawn.");
-                    if (sourceSystem != null) {
-                        Connection startConnection = findAnyAvailableConnectionFromSystem(sourceSystem, gameState);
-                        if (startConnection != null) {
-                            PacketType typeToSpawn = random.nextBoolean() ? PacketType.SQUARE : PacketType.TRIANGLE;
-                            Packet newPacket = new Packet(
-                                    typeToSpawn,
-                                    startConnection.getStartPort().getAbsoluteX(),
-                                    startConnection.getStartPort().getAbsoluteY()
-                            );
+        List<SystemNode> sourceSystems = gameState.getSystemsByRole(SystemRole.SOURCE);
+        if (sourceSystems.isEmpty()) {
+            return;
+        }
+        SystemNode source = sourceSystems.get(random.nextInt(sourceSystems.size()));
 
-                            gameState.registerSpawnedPacket(newPacket);
-                            newPacket.startMoving(startConnection);
-                            gameState.addPacket(newPacket);
-                            System.out.println("GC.Spawn: Packet " + typeToSpawn + " spawned from Source " + sourceSystem.hashCode() % 1000 + ". Total successfully spawned: " + gameState.getTotalPacketsSuccessfullySpawnedCount());
-
-                        } else {System.out.println("GC.Spawn: No available connection from Source System " + sourceSystem.hashCode() % 1000);
-                        }
-                    } else {
-                    }
-                } else {
-                }
-            } else {
-                if (!gameState.canSpawnMorePackets()) {
-                }
-                if (gameState.isLevelTimeUp()) {
-                }
+        List<Port> availablePorts = new ArrayList<>();
+        for (Port port : source.getOutputPorts()) {
+            Connection conn = port.getConnectedConnection();
+            if (conn != null && !isConnectionOccupied(conn, gameState)) {
+                availablePorts.add(port);
             }
+        }
+
+        if (!availablePorts.isEmpty()) {
+            Port chosenPort = availablePorts.get(random.nextInt(availablePorts.size()));
+
+            // *** FIX: Spawn a RANDOM packet type, not one based on the port ***
+            PacketType[] spawnableTypes = { PacketType.SQUARE, PacketType.TRIANGLE, PacketType.MESSENGER_INFINITY };
+            PacketType typeToSpawn = spawnableTypes[random.nextInt(spawnableTypes.length)];
+            // *** END OF FIX ***
+
+            Packet newPacket = new Packet(typeToSpawn, chosenPort.getAbsoluteX(), chosenPort.getAbsoluteY());
+
+            gameState.addPacket(newPacket);
+            gameState.registerSpawnedPacket(newPacket);
+
+            // The startMoving method inside Packet.java will handle the physics
+            // based on whether typeToSpawn is compatible with chosenPort.getPacketType()
+            newPacket.startMoving(chosenPort.getConnectedConnection());
+
+            System.out.println("GC.Spawn: Spawned " + typeToSpawn + " from " + chosenPort.getPacketType() + " port. Total: " + gameState.getTotalPacketsSuccessfullySpawnedCount());
         }
     }
 

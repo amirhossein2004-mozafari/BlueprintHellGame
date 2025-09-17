@@ -1,37 +1,41 @@
 {
   "levelNumber": 3,
-  "packetsToSpawn": 20,
-  "levelDurationSeconds": 120.0,
-  "initialWireLength": 6000.0,
+  "packetsToSpawn": 45,
+  "levelDurationSeconds": 240,
+  "initialWireLength": 7000,
   "systems": [
     {
-      "x": 150,
-      "y": 300,
-      "role": "SOURCE",
-      "ports": {
-        "squareOutputs": 1,
-        "triangleOutputs": 1
-      }
+      "x": 50, "y": 300, "role": "SOURCE",
+      "ports": { "squareOutputs": 2, "triangleOutputs": 1, "messengerOutputs": 1 }
     },
     {
-      "x": 450,
-      "y": 300,
-      "role": "VPN",
-      "ports": {
-        "squareInputs": 1,
-        "triangleInputs": 1,
-        "squareOutputs": 1,
-        "triangleOutputs": 1
-      }
+      "x": 900, "y": 300, "role": "SINK",
+      "ports": { "squareInputs": 1, "triangleInputs": 1, "messengerInputs": 1 }
     },
     {
-      "x": 750,
-      "y": 300,
-      "role": "SINK",
-      "ports": {
-        "squareInputs": 1,
-        "triangleInputs": 1
-      }
+      "x": 230, "y": 160, "role": "VPN",
+      "comment": "3",
+      "ports": { "triangleInputs": 1, "triangleOutputs": 1 }
+    },
+    {
+      "x": 700, "y": 350, "role": "INTERMEDIATE",
+      "comment": "7",
+      "ports": { "triangleInputs": 2, "squareOutputs": 1 }
+    },
+    {
+      "x": 300, "y": 450, "role": "SPY",
+      "comment": "2",
+      "ports": { "squareInputs": 2 , "squareOutputs": 1   }
+    },
+    {
+      "x": 650, "y": 170, "role": "SPY",
+      "comment": "5",
+      "ports": { "squareInputs": 1, "messengerOutputs": 1,   "triangleOutputs": 1 }
+    },
+    {
+      "x": 500, "y": 300, "role": "INTERMEDIATE",
+      "comment": "4",
+      "ports": { "squareInputs": 1, "messengerInputs": 1,   "triangleInputs": 1,   "squareOutputs": 1,    "triangleOutputs": 2 }
     }
   ]
 }
