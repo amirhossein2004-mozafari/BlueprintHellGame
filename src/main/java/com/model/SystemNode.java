@@ -2,9 +2,11 @@ package com.model;
 
 import com.blueprinthell.Config;
 import javafx.geometry.Point2D;
+import javafx.scene.paint.Color;
 import org.json.JSONObject;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 
 public class SystemNode {
@@ -41,9 +43,8 @@ public class SystemNode {
 
 
     public SystemNode(double x, double y, SystemRole role) {
-        this(x, y, role, 0, 0, 0, 0, 0, 0, 0, 0); // Call main constructor with all zeros
+        this(x, y, role, 0, 0, 0, 0, 0, 0, 0, 0);
 
-        // Now, apply default port configurations based on role by calling createSpecificPorts AGAIN
         switch (role) {
             case SOURCE: createSpecificPorts(0, 0, 0, 0, 1, 1, 1, 1); break;
             case SINK: createSpecificPorts(1, 1, 1, 1, 0, 0, 0, 0); break;
@@ -93,14 +94,11 @@ public class SystemNode {
 
     private void createSpecificPorts(int numSquareIn, int numTriangleIn, int numLargeIn, int numMessengerIn,
                                      int numSquareOut, int numTriangleOut, int numLargeOut, int numMessengerOut) {
-        // --- Create INPUT ports ---
         List<PacketType> inputTypes = new ArrayList<>();
         for (int i = 0; i < numSquareIn; i++) inputTypes.add(PacketType.SQUARE);
         for (int i = 0; i < numTriangleIn; i++) inputTypes.add(PacketType.TRIANGLE);
         for (int i = 0; i < numLargeIn; i++) inputTypes.add(PacketType.LARGE);
-        // *** FIX START: The missing line to add messenger inputs ***
         for (int i = 0; i < numMessengerIn; i++) inputTypes.add(PacketType.MESSENGER_INFINITY);
-        // *** FIX END ***
 
         if (!inputTypes.isEmpty()) {
             double inputSpacing = height / (double) (inputTypes.size() + 1);
@@ -110,7 +108,6 @@ public class SystemNode {
             }
         }
 
-        // --- Create OUTPUT ports ---
         List<PacketType> outputTypes = new ArrayList<>();
         for (int i = 0; i < numSquareOut; i++) outputTypes.add(PacketType.SQUARE);
         for (int i = 0; i < numTriangleOut; i++) outputTypes.add(PacketType.TRIANGLE);
@@ -147,162 +144,200 @@ public class SystemNode {
     public void receivePacket(Packet packet, GameState gameState) {
         if (packet == null || gameState == null) return;
 
-        // *** FIX START: Logic to add coins when a packet enters any system (except SINK) ***
-        // According to the document, coins are added upon entry to a system.
         if (this.role != SystemRole.SINK) {
             int coinsToAdd = 0;
             switch (packet.getType()) {
-                case SQUARE:
-                    coinsToAdd = 2; // As per the document: 2 coins
-                    break;
-                case TRIANGLE:
-                    coinsToAdd = 3; // As per the document: 3 coins
-                    break;
-                case MESSENGER_INFINITY:
-                    coinsToAdd = 1; // As per the document: 1 coin
-                    break;
+                case SQUARE: coinsToAdd = 2; break;
+                case TRIANGLE: coinsToAdd = 3; break;
+                case MESSENGER_INFINITY: coinsToAdd = 1; break;
+                case CONFIDENTIAL_NORMAL: coinsToAdd = 3; break;
+                case CONFIDENTIAL_DISTANCING: coinsToAdd = 4; break;
+                case PROTECTED: coinsToAdd = Config.COINS_PER_PROTECTED_PACKET_SYSTEM_ENTRY; break;
             }
-            if (coinsToAdd > 0) {
-                gameState.addCoin(coinsToAdd);
-            }
+            if (coinsToAdd > 0) gameState.addCoin(coinsToAdd);
         }
-        // *** FIX END ***
 
         packet.setCurrentConnection(null);
+        packet.setLastVisitedSystem(this);
 
         if (packet.isLargePacket() && (this.role != SystemRole.SOURCE && this.role != SystemRole.DISTRIBUTE)) {
             this.wipeStoredPackets();
             this.randomizePort();
         }
 
-        if (this.role == SystemRole.VPN) {
-            Connection exit = findAnyFreeOutputConnection(this, gameState);
-            if (exit != null) {
-                Packet protectedPacket = new Packet(PacketType.PROTECTED, packet.getX(), packet.getY());
-                gameState.addPacket(protectedPacket);
-                protectedPacket.startMoving(exit);
+        if ((this.role == SystemRole.SABOTEUR || this.role == SystemRole.SPY) && packet.getType() == PacketType.PROTECTED) {
+            Packet revertedPacket = new Packet(packet.getOriginalType(), packet.getX(), packet.getY());
+            if(storedPackets.size() < Config.SYSTEM_PACKET_STORAGE_CAPACITY) {
+                storedPackets.add(revertedPacket);
+                System.out.println("Protected packet has been reverted to " + revertedPacket.getType());
+            } else {
+                gameState.registerCompletelyLostPacket(revertedPacket);
             }
+            return;
+        }
+
+
+        if (this.role == SystemRole.SINK) {
+            return;
         }
         else if (this.role == SystemRole.DISTRIBUTE) {
             if (packet.isLargePacket()) {
-                final int numberOfBits = packet.getCurrentSize();
+                final int numberOfBits = packet.getInitialSize();
                 final String parentId = packet.getId();
+                Color batchColor = Color.rgb(random.nextInt(156) + 100, random.nextInt(156) + 100, random.nextInt(156) + 100);
                 for (int i = 0; i < numberOfBits; i++) {
                     Connection exit = findAnyFreeOutputConnection(this, gameState);
                     if (exit != null) {
                         Packet bitPacket = new Packet(PacketType.BIT_PACKET, this.getX(), this.getY());
                         bitPacket.setParentLargePacketId(parentId);
                         bitPacket.setTotalBitsForParent(numberOfBits);
+                        bitPacket.setVisualColor(batchColor);
                         gameState.addPacket(bitPacket);
                         bitPacket.startMoving(exit);
                     }
                 }
             } else {
-                storedPackets.add(packet);
+                if (storedPackets.size() < Config.SYSTEM_PACKET_STORAGE_CAPACITY) {
+                    storedPackets.add(packet);
+                } else {
+                    gameState.registerCompletelyLostPacket(packet);
+                }
             }
         }
-        // *** FIX: Changed 'if' to 'else if' for correct logic flow ***
         else if (this.role == SystemRole.MERGE) {
             if (packet.getType() == PacketType.BIT_PACKET) {
                 String parentId = packet.getParentLargePacketId();
                 if (parentId != null) {
-
                     List<Packet> bitsForParent = receivedBitPackets.computeIfAbsent(parentId, k -> new ArrayList<>());
                     bitsForParent.add(packet);
-
                     int totalBitsExpected = packet.getTotalBitsForParent();
-                    System.out.println("Merge system received bit-packet for parent " + parentId.substring(0, 4) +
-                            ". Total received: " + bitsForParent.size() + "/" + totalBitsExpected);
-
                     if (totalBitsExpected > 0 && bitsForParent.size() == totalBitsExpected) {
-                        System.out.println("All bits for " + parentId.substring(0, 4) + " collected! Reconstructing LARGE packet.");
-
-                        Packet reconstructedLargePacket = new Packet(
-                                (totalBitsExpected == 8) ? PacketType.LARGE_8 : PacketType.LARGE_10,
-                                this.getX(),
-                                this.getY()
-                        );
-
-                        Connection exitConn = findAnyFreeOutputConnection(this, gameState);
-                        if (exitConn != null) {
-                            System.out.println("Found a free exit. Forwarding the new LARGE packet immediately.");
-
-                            gameState.addPacket(reconstructedLargePacket);
-
-                            SystemNode nextSystem = exitConn.getEndPort().getParentSystem();
-                            nextSystem.wipeStoredPackets();
-                            nextSystem.randomizePort();
-
-                            reconstructedLargePacket.startMoving(exitConn);
+                        Packet reconstructed = new Packet(
+                                (totalBitsExpected == 8) ? PacketType.LARGE_8 : PacketType.LARGE_10, this.getX(), this.getY());
+                        if (storedPackets.size() < Config.SYSTEM_PACKET_STORAGE_CAPACITY) {
+                            storedPackets.add(reconstructed);
                         } else {
-
-                            System.out.println("No free exit found. Storing reconstructed packet for later.");
-                            storedPackets.add(reconstructedLargePacket);
+                            gameState.registerCompletelyLostPacket(reconstructed);
                         }
                         receivedBitPackets.remove(parentId);
                     }
                 }
             } else {
-                storedPackets.add(packet);
+                if (storedPackets.size() < Config.SYSTEM_PACKET_STORAGE_CAPACITY) {
+                    storedPackets.add(packet);
+                } else {
+                    gameState.registerCompletelyLostPacket(packet);
+                }
             }
         }
-        else if (this.role == SystemRole.SABOTEUR) {
-            if (packet.getNoiseLevel() == 0.0) packet.addNoise(0.1);
-            if (random.nextDouble() < 0.20) {
-                Packet trojan = new Packet(PacketType.TROJAN, packet.getX(), packet.getY());
-                gameState.addPacket(trojan);
-                storedPackets.add(trojan);
-            } else {
+        else if (this.role == SystemRole.VPN || this.role == SystemRole.SPY || this.role == SystemRole.INTERMEDIATE || this.role == SystemRole.SABOTEUR) {
+            if (packet.getType() == PacketType.BIT_PACKET) {
                 storedPackets.add(packet);
             }
-        }
-        else if (this.role == SystemRole.INTERMEDIATE || this.role == SystemRole.SPY) {
-            if (storedPackets.size() < Config.SYSTEM_PACKET_STORAGE_CAPACITY) {
-                packet.getVelocity().set(0, 0);
-                packet.setCurrentSegmentIndex(0);
+            else if (storedPackets.size() < Config.SYSTEM_PACKET_STORAGE_CAPACITY) {
                 storedPackets.add(packet);
             } else {
                 gameState.registerCompletelyLostPacket(packet);
             }
         }
-        else if (this.role == SystemRole.SINK) {
-            // Packets are simply absorbed, no further action needed.
-        }
     }
-
 
     public void update(double deltaTime, GameState gameState) {
         if (gameState == null || storedPackets.isEmpty()) {
             return;
         }
 
-        List<Connection> availableExits;
+        var packetIterator = storedPackets.iterator();
+        while (packetIterator.hasNext()) {
 
+            Packet originalPacket = packetIterator.next();
+            Packet packetToSend = originalPacket;
 
-
-        if (this.role == SystemRole.SPY) {
-
-            availableExits = new ArrayList<>();
-            List<SystemNode> spyNetwork = gameState.getSystemsByRole(SystemRole.SPY);
-
-            Packet packetToCheck = storedPackets.get(0); // Check the first packet in the queue
-            SystemNode lastVisitedSystem = packetToCheck.getLastVisitedSystem();
-
-            for (SystemNode spyNode : spyNetwork) {
-                // A SPY system cannot send a packet back to the SPY it just came from.
-                if (spyNode == this || spyNode == lastVisitedSystem) {
-                    continue;
+            if (this.role == SystemRole.VPN) {
+                if (originalPacket.getType() == PacketType.CONFIDENTIAL_NORMAL) {
+                    packetToSend = new Packet(PacketType.CONFIDENTIAL_DISTANCING, originalPacket.getX(), originalPacket.getY());
                 }
-                for (Port port : spyNode.getOutputPorts()) {
+                else if (originalPacket.getType() != PacketType.PROTECTED && originalPacket.getType() != PacketType.CONFIDENTIAL_DISTANCING) {
+                    packetToSend = new Packet(PacketType.PROTECTED, originalPacket.getX(), originalPacket.getY());
+                    packetToSend.setOriginalType(originalPacket.getType());
+                }
+            } else if (this.role == SystemRole.SABOTEUR) {
+                if (originalPacket.getNoiseLevel() == 0.0) originalPacket.addNoise(0.1);
+                if (random.nextDouble() < 0.20 && originalPacket.getType() != PacketType.PROTECTED) {
+                    packetToSend = new Packet(PacketType.TROJAN, originalPacket.getX(), originalPacket.getY());
+                }
+            }
+
+            List<Connection> availableExits = new ArrayList<>();
+            if (this.role == SystemRole.SPY) {
+                for (SystemNode spyNode : gameState.getSystemsByRole(SystemRole.SPY)) {
+                    if (spyNode == this || spyNode == originalPacket.getLastVisitedSystem()) continue;
+                    for (Port p : spyNode.getOutputPorts()) {
+                        if (p.isConnected() && !isConnectionOccupied(p.getConnectedConnection(), gameState)) {
+                            availableExits.add(p.getConnectedConnection());
+                        }
+                    }
+                }
+            } else {
+                for (Port port : this.getOutputPorts()) {
                     if (port.isConnected() && !isConnectionOccupied(port.getConnectedConnection(), gameState)) {
                         availableExits.add(port.getConnectedConnection());
                     }
                 }
             }
-            // *** FIX END ***
-        } else {
 
-            availableExits = new ArrayList<>();
+            if (availableExits.isEmpty()) {
+                break;
+            }
+
+            Connection chosenExit = null;
+            if (this.role == SystemRole.SABOTEUR) {
+                List<Connection> incompatible = new ArrayList<>();
+                for (Connection c : availableExits) {
+                    if (c.getStartPort().getPacketType() != packetToSend.getType()) {
+                        incompatible.add(c);
+                    }
+                }
+                chosenExit = !incompatible.isEmpty() ? incompatible.get(random.nextInt(incompatible.size())) : availableExits.get(random.nextInt(availableExits.size()));
+            } else {
+                List<Connection> compatible = new ArrayList<>();
+                for (Connection c : availableExits) {
+                    if (c.getStartPort().getPacketType() == packetToSend.getType()) {
+                        compatible.add(c);
+                    }
+                }
+                chosenExit = !compatible.isEmpty() ? compatible.get(random.nextInt(compatible.size())) : availableExits.get(random.nextInt(availableExits.size()));
+            }
+
+            if (chosenExit != null) {
+
+                gameState.addPacket(packetToSend);
+
+                if (this.role == SystemRole.SPY && chosenExit.getStartPort().getParentSystem() != this) {
+                    packetToSend.setX(chosenExit.getStartPort().getAbsoluteX());
+                    packetToSend.setY(chosenExit.getStartPort().getAbsoluteY());
+                }
+
+                packetToSend.startMoving(chosenExit);
+                packetIterator.remove();
+            } else {
+                break;
+            }
+        }
+    }
+
+    private Connection findBestExit(Packet packet, GameState gameState) {
+        List<Connection> availableExits = new ArrayList<>();
+        if (this.role == SystemRole.SPY) {
+            List<SystemNode> spyNetwork = gameState.getSystemsByRole(SystemRole.SPY);
+            for(SystemNode spyNode : spyNetwork){
+                if(spyNode == this || spyNode == packet.getLastVisitedSystem()) continue;
+                for(Port p : spyNode.getOutputPorts()){
+                    if(p.isConnected() && !isConnectionOccupied(p.getConnectedConnection(), gameState))
+                        availableExits.add(p.getConnectedConnection());
+                }
+            }
+        } else {
             for (Port port : this.getOutputPorts()) {
                 if (port.isConnected() && !isConnectionOccupied(port.getConnectedConnection(), gameState)) {
                     availableExits.add(port.getConnectedConnection());
@@ -310,62 +345,23 @@ public class SystemNode {
             }
         }
 
+        if (availableExits.isEmpty()) return null;
 
-        if (availableExits.isEmpty()) {
-            return;
+        List<Connection> compatibleExits = availableExits.stream()
+                .filter(c -> c.getStartPort().getPacketType() == packet.getType())
+                .collect(Collectors.toList());
+
+        if (!compatibleExits.isEmpty()) {
+            return compatibleExits.get(random.nextInt(compatibleExits.size()));
         }
 
-
-        var packetIterator = storedPackets.iterator();
-        while (packetIterator.hasNext() && !availableExits.isEmpty()) {
-
-            Packet packetToSend = packetIterator.next();
-            packetToSend.setLastVisitedSystem(this);
-            Connection chosenExit = null;
-
-
-            if (this.role == SystemRole.SABOTEUR) {
-
-                List<Connection> incompatibleExits = availableExits.stream()
-                        .filter(c -> c.getStartPort().getPacketType() != packetToSend.getType())
-                        .toList();
-                if (!incompatibleExits.isEmpty()) {
-                    chosenExit = incompatibleExits.get(random.nextInt(incompatibleExits.size()));
-                } else {
-                    chosenExit = availableExits.get(random.nextInt(availableExits.size()));
-                }
-            } else {
-
-                List<Connection> compatibleExits = availableExits.stream()
-                        .filter(c -> c.getStartPort().getPacketType() == packetToSend.getType())
-                        .toList();
-                if (!compatibleExits.isEmpty()) {
-                    chosenExit = compatibleExits.get(random.nextInt(compatibleExits.size()));
-                } else {
-
-                    if(this.role == SystemRole.INTERMEDIATE){
-                        chosenExit = availableExits.get(random.nextInt(availableExits.size()));
-                    }
-                }
-            }
-
-
-            if (chosenExit != null) {
-
-                if (chosenExit.getStartPort().getParentSystem() != this) {
-                    Port exitPort = chosenExit.getStartPort();
-                    packetToSend.setX(exitPort.getAbsoluteX());
-                    packetToSend.setY(exitPort.getAbsoluteY());
-                }
-
-                packetToSend.startMoving(chosenExit);
-                gameState.addPacket(packetToSend);
-
-                packetIterator.remove();
-                availableExits.remove(chosenExit);
-            }
+        if(this.role == SystemRole.INTERMEDIATE){
+            return availableExits.get(random.nextInt(availableExits.size()));
         }
+
+        return null;
     }
+
 
     private Connection findCompatibleFreeOutputConnection(SystemNode system, GameState state, PacketType packetType) {
         if (system == null || state == null || packetType == null) return null;
@@ -548,6 +544,8 @@ public class SystemNode {
         return packetsToSend;
     }
 
+
+
     public void wipeStoredPackets() {
         if (!storedPackets.isEmpty()) {
             System.out.println("System " + (this.hashCode() % 1000) + " storage wiped by LARGE packet!");
@@ -557,20 +555,20 @@ public class SystemNode {
 
 
     public void randomizePort() {
+        List<Port> allPorts = new ArrayList<>();
+        allPorts.addAll(inputPorts);
+        allPorts.addAll(outputPorts);
+        if (allPorts.isEmpty()) return;
 
-        if (this.inputPorts.isEmpty()) {
-            return;
-        }
-
-        Port portToChange = this.inputPorts.get(random.nextInt(this.inputPorts.size()));
-
+        Port portToChange = allPorts.get(random.nextInt(allPorts.size()));
         PacketType oldType = portToChange.getPacketType();
-        PacketType newType = (oldType == PacketType.SQUARE) ? PacketType.TRIANGLE : PacketType.SQUARE;
+        PacketType newType;
+        if (oldType == PacketType.SQUARE) newType = PacketType.TRIANGLE;
+        else if (oldType == PacketType.TRIANGLE) newType = PacketType.SQUARE;
+        else return;
 
-        System.out.println("System " + (this.hashCode()%1000) + ": Port type randomized from " + oldType + " to " + newType);
         portToChange.setPacketType(newType);
-
-
+        System.out.println("System " + (this.hashCode()%1000) + ": Port type randomized from " + oldType + " to " + newType);
     }
 
     public void setPosition(double x, double y) {

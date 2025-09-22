@@ -130,21 +130,38 @@ public class GameController {
         if (!availablePorts.isEmpty()) {
             Port chosenPort = availablePorts.get(random.nextInt(availablePorts.size()));
 
-            // *** FIX: Spawn a RANDOM packet type, not one based on the port ***
-            PacketType[] spawnableTypes = { PacketType.SQUARE, PacketType.TRIANGLE, PacketType.MESSENGER_INFINITY };
+
+            PacketType[] spawnableTypes;
+
+            if (gameState.getCurrentLevelNumber() >= 5) {
+                spawnableTypes = new PacketType[] {
+                        PacketType.SQUARE,
+                        PacketType.TRIANGLE,
+                        PacketType.MESSENGER_INFINITY,
+                        PacketType.CONFIDENTIAL_NORMAL,
+                        PacketType.LARGE_8,
+                        PacketType.LARGE_10
+                };
+            } else {
+                spawnableTypes = new PacketType[] {
+                        PacketType.SQUARE,
+                        PacketType.TRIANGLE,
+                        PacketType.MESSENGER_INFINITY,
+                        PacketType.CONFIDENTIAL_NORMAL
+                };
+            }
+
             PacketType typeToSpawn = spawnableTypes[random.nextInt(spawnableTypes.length)];
-            // *** END OF FIX ***
+
 
             Packet newPacket = new Packet(typeToSpawn, chosenPort.getAbsoluteX(), chosenPort.getAbsoluteY());
 
             gameState.addPacket(newPacket);
             gameState.registerSpawnedPacket(newPacket);
 
-            // The startMoving method inside Packet.java will handle the physics
-            // based on whether typeToSpawn is compatible with chosenPort.getPacketType()
             newPacket.startMoving(chosenPort.getConnectedConnection());
 
-            System.out.println("GC.Spawn: Spawned " + typeToSpawn + " from " + chosenPort.getPacketType() + " port. Total: " + gameState.getTotalPacketsSuccessfullySpawnedCount());
+            System.out.println("GC.Spawn: Spawned " + typeToSpawn + " for level " + gameState.getCurrentLevelNumber() + ". Total spawned: " + gameState.getTotalPacketsSuccessfullySpawnedCount());
         }
     }
 
@@ -648,21 +665,17 @@ public class GameController {
 
         if (!connectionsToRemove.isEmpty()) {
             for (Connection connToRemove : connectionsToRemove) {
-
-
                 for (Packet p : new ArrayList<>(gameState.getPackets())) {
                     if (p.getCurrentConnection() == connToRemove) {
                         gameState.registerCompletelyLostPacket(p);
+                        gameView.removePacketNode(p);
                         gameState.removePacket(p);
                     }
                 }
-
                 if(connToRemove.getStartPort() != null) connToRemove.getStartPort().setConnectedConnection(null);
                 if(connToRemove.getEndPort() != null) connToRemove.getEndPort().setConnectedConnection(null);
-
                 gameState.removeConnection(connToRemove);
             }
-
             gameView.redrawAll(gameState);
         }
     }

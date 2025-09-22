@@ -52,6 +52,9 @@ public final class Config {
     public static final double MIN_IMPACT_DISTANCE_THRESHOLD = 0.1;
     public static final double PACKET_WAVE_NOISE_AMOUNT = 0.25;
 
+    public static final int COINS_PER_PROTECTED_PACKET_SYSTEM_ENTRY = 5;
+    public static final double PROTECTED_PACKET_SIZE_MULTIPLIER = 2.0;
+
     public static final double INITIAL_OFF_WIRE_VELOCITY_X = 2.0;
     public static final double INITIAL_OFF_WIRE_VELOCITY_Y = 2.0;
     public static final double SQUARE_COMPATIBLE_SPEED_FACTOR = 1.0;
@@ -117,6 +120,12 @@ public final class Config {
     public static final double WIRE_INDICATOR_HEIGHT = 35.0;
     public static final double WIRE_INDICATOR_CORNER_ARC = 8.0;
     public static final double WIRE_INDICATOR_PADDING = 10.0;
+
+    public static final int PACKET_CONFIDENTIAL_NORMAL_INITIAL_SIZE = 4;
+    public static final int PACKET_CONFIDENTIAL_DISTANCING_INITIAL_SIZE = 6;
+    public static final double CONFIDENTIAL_PACKET_SLOWDOWN_FACTOR = 0.25;
+    public static final double CONFIDENTIAL_PACKET_IDEAL_DISTANCE = 80.0;
+    public static final double CONFIDENTIAL_PACKET_FORCE_STRENGTH = 5.0;
 
     public static final Color COLOR_BACKGROUND = Color.rgb(20, 20, 30);
     public static final Color COLOR_SYSTEM_RECT = Color.rgb(70, 70, 90);

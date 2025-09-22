@@ -77,6 +77,7 @@ public class Connection {
 
     public void registerLargePacketPassage() {
         this.largePacketPassages++;
+        System.out.println("Connection " + this.id.substring(0,4) + " has had " + this.largePacketPassages + " large packets pass.");
     }
 
 

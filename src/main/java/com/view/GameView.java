@@ -14,6 +14,7 @@ import javafx.scene.text.FontWeight;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javafx.scene.paint.Color;
 
 
 public class GameView extends Pane {
@@ -196,23 +197,27 @@ public class GameView extends Pane {
             trianglePort.getPoints().addAll(x1, y1, x2, y2, x3, y3);
             trianglePort.setFill(Config.COLOR_PORT_TRIANGLE);
             return trianglePort;
-        } else if (port.getPacketType() == PacketType.LARGE) {
-            size = Config.PORT_BASE_SIZE_UNIT * 2.5; // Larger size for LARGE ports
-            Rectangle largePortShape = new Rectangle(cx - size, cy - size, size * 2, size * 2);
-            largePortShape.setFill(Color.MAGENTA); // Magenta color
-            return largePortShape;
+        } else if (port.isLargePortType()) {
+            size = Config.PORT_BASE_SIZE_UNIT * 2.0;
+            Polygon hexagon = new Polygon();
+            for (int i = 0; i < 6; i++) {
+                hexagon.getPoints().addAll(
+                        cx + size * Math.cos(Math.toRadians(i * 60)),
+                        cy + size * Math.sin(Math.toRadians(i * 60))
+                );
+            }
+            hexagon.setFill(Color.MAGENTA.darker());
+            return hexagon;
         } else if (port.getPacketType() == PacketType.MESSENGER_INFINITY) {
-            // *** CHANGE START: Using a Path to create the infinity symbol for the port ***
             size = Config.PORT_BASE_SIZE_UNIT * 1.5;
             Path path = new Path();
             path.getElements().add(new MoveTo(cx - size, cy));
             path.getElements().add(new CubicCurveTo(cx - size, cy - size, cx + size, cy + size, cx + size, cy));
             path.getElements().add(new CubicCurveTo(cx + size, cy - size, cx - size, cy + size, cx - size, cy));
-            path.setFill(Color.LIGHTGRAY); // A light color for the port
+            path.setFill(Color.LIGHTGRAY);
             path.setStroke(Color.WHITE);
             path.setStrokeWidth(0.5);
             return path;
-            // *** CHANGE END ***
         } else {
             return new Circle(cx, cy, Config.PORT_BASE_SIZE_UNIT * 0.5, Color.GRAY);
         }
@@ -273,52 +278,81 @@ public class GameView extends Pane {
         double y = packet.getY();
         Shape node;
 
-        if (packet.getType() == PacketType.SQUARE) {
-            size = Config.PORT_VISUAL_SIZE_SQUARE * 2;
-            node = new Rectangle(x - size / 2.0, y - size / 2.0, size, size);
-            node.setFill(Config.COLOR_PACKET_SQUARE);
-        } else if (packet.getType() == PacketType.TRIANGLE) {
-            size = Config.PORT_VISUAL_SIZE_TRIANGLE * 1.8;
-            Polygon poly = new Polygon();
-            double height = size * Math.sqrt(3) / 2.0;
-            poly.getPoints().addAll(x, y - height * (2.0/3.0), x - size / 2.0, y + height * (1.0/3.0), x + size / 2.0, y + height * (1.0/3.0));
-            node = poly;
-            node.setFill(Config.COLOR_PACKET_TRIANGLE);
-        } else if (packet.getType() == PacketType.PROTECTED) {
-            size = 8;
-            node = new Circle(x, y, size / 2.0);
-            node.setFill(Color.DODGERBLUE);
-            node.setStroke(Color.WHITE);
-            node.setStrokeWidth(1.5);
-        } else if (packet.getType() == PacketType.TROJAN) {
-            size = 9;
-            node = new Circle(x, y, size / 2.0);
-            node.setFill(Color.CRIMSON);
-            node.setStroke(Color.WHITE);
-        } else if (packet.getType() == PacketType.MESSENGER_INFINITY) {
-            // *** CHANGE START: Using a Path to create the infinity symbol for the packet ***
-            size = Config.PORT_BASE_SIZE_UNIT * 1.8;
-            Path path = new Path();
-            path.getElements().add(new MoveTo(x - size, y));
-            path.getElements().add(new CubicCurveTo(x - size, y - size, x + size, y + size, x + size, y));
-            path.getElements().add(new CubicCurveTo(x + size, y - size, x - size, y + size, x - size, y));
-            node = path;
-            node.setFill(Color.WHITE); // White color as requested
-            // *** CHANGE END ***
-        } else if (packet.getType() == PacketType.LARGE) {
-            size = 12;
-            Rectangle rect = new Rectangle(x - size/2, y - size/2, size, size);
-            rect.setArcWidth(4); rect.setArcHeight(4);
-            node = rect;
-            node.setFill(Color.MAGENTA);
-        } else if (packet.getType() == PacketType.BIT_PACKET) {
-            size = 5;
-            node = new Circle(x, y, size/2.0);
-            node.setFill(Color.YELLOW);
-        } else {
+        switch (packet.getType()) {
+            case SQUARE:
+                size = Config.PORT_VISUAL_SIZE_SQUARE * 2;
+                node = new Rectangle(x - size / 2.0, y - size / 2.0, size, size);
+                node.setFill(Config.COLOR_PACKET_SQUARE);
+                break;
+            case TRIANGLE:
+                size = Config.PORT_VISUAL_SIZE_TRIANGLE * 1.8;
+                Polygon poly = new Polygon();
+                double height = size * Math.sqrt(3) / 2.0;
+                poly.getPoints().addAll(x, y - height * (2.0/3.0), x - size / 2.0, y + height * (1.0/3.0), x + size / 2.0, y + height * (1.0/3.0));
+                node = poly;
+                node.setFill(Config.COLOR_PACKET_TRIANGLE);
+                break;
+            case PROTECTED:
+                size = 8;
+                node = new Circle(x, y, size / 2.0);
+                node.setFill(Color.DODGERBLUE);
+                node.setStroke(Color.WHITE);
+                node.setStrokeWidth(1.5);
+                break;
+            case TROJAN:
+                size = 9;
+                node = new Circle(x, y, size / 2.0);
+                node.setFill(Color.CRIMSON);
+                node.setStroke(Color.WHITE);
+                break;
+            case MESSENGER_INFINITY:
+                size = Config.PORT_BASE_SIZE_UNIT * 1.8;
+                Path path = new Path();
+                path.getElements().add(new MoveTo(x - size, y));
+                path.getElements().add(new CubicCurveTo(x - size, y - size, x + size, y + size, x + size, y));
+                path.getElements().add(new CubicCurveTo(x + size, y - size, x - size, y + size, x - size, y));
+                node = path;
+                node.setFill(Color.WHITE);
+                break;
+            case CONFIDENTIAL_NORMAL:
+                size = 10;
+                node = new Circle(x, y, size / 2.0);
+                node.setFill(Color.MIDNIGHTBLUE);
+                node.setStroke(Color.LIGHTBLUE);
+                node.setStrokeWidth(1.5);
+                break;
+            case CONFIDENTIAL_DISTANCING:
+                size = 12;
+                node = new Circle(x, y, size / 2.0);
+                node.setFill(Color.DARKSLATEGRAY);
+                node.setStroke(Color.CYAN);
+                node.setStrokeWidth(1.5);
+                break;
 
-            node = new Circle(x,y,5);
-            node.setFill(Color.WHITE);
+            case LARGE_8:
+            case LARGE_10:
+                size = 14;
+                Polygon hexagon = new Polygon();
+                for (int i = 0; i < 6; i++) {
+                    hexagon.getPoints().addAll(
+                            x + size * 0.5 * Math.cos(Math.toRadians(i * 60 + 30)),
+                            y + size * 0.5 * Math.sin(Math.toRadians(i * 60 + 30))
+                    );
+                }
+                node = hexagon;
+                node.setFill(packet.getType() == PacketType.LARGE_8 ? Color.CORNFLOWERBLUE : Color.DEEPSKYBLUE);
+                break;
+
+            case BIT_PACKET:
+                size = 5;
+                node = new Circle(x, y, size / 2.0);
+                node.setFill((packet.getVisualColor() != null) ? packet.getVisualColor() : Color.YELLOW);
+                break;
+
+            default:
+                node = new Circle(x, y, 5);
+                node.setFill(Color.WHITE);
+                break;
         }
 
         if (node.getStroke() == null) node.setStroke(Color.DARKSLATEGRAY);

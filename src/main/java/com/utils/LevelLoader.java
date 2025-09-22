@@ -12,7 +12,6 @@ import java.io.IOException;
 
 public class LevelLoader {
 
-    // In LevelLoader.java
 
     public static GameState loadLevel(int levelNumberToLoad) {
         String fileName = "/levels/level" + levelNumberToLoad + ".json";
@@ -45,14 +44,14 @@ public class LevelLoader {
                     int sqIn = portsJson.optInt("squareInputs", 0);
                     int trIn = portsJson.optInt("triangleInputs", 0);
                     int lgIn = portsJson.optInt("largeInputs", 0);
-                    int msgIn = portsJson.optInt("messengerInputs", 0); // <<< ADD THIS
+                    int msgIn = portsJson.optInt("messengerInputs", 0);
 
                     int sqOut = portsJson.optInt("squareOutputs", 0);
                     int trOut = portsJson.optInt("triangleOutputs", 0);
                     int lgOut = portsJson.optInt("largeOutputs", 0);
                     int msgOut = portsJson.optInt("messengerOutputs", 0);
 
-                    SystemNode systemNode = new SystemNode(x, y, role, sqIn, trIn, lgIn, msgIn, sqOut, trOut, lgOut, msgOut); // <<< ADD msgIn
+                    SystemNode systemNode = new SystemNode(x, y, role, sqIn, trIn, lgIn, msgIn, sqOut, trOut, lgOut, msgOut);
                     gameState.addSystem(systemNode);
                 }
                 return gameState;

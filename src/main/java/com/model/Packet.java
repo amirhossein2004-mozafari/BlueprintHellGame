@@ -4,10 +4,12 @@ import com.blueprinthell.Config;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.geometry.Point2D;
-import java.util.UUID;
-import java.util.HashMap;
-import java.util.Map;
+
+import java.awt.*;
+import java.util.*;
 import java.util.List;
+
+import javafx.scene.paint.Color;
 
 
 public class Packet {
@@ -37,10 +39,12 @@ public class Packet {
     private int currentSegmentIndex;
     private String parentLargePacketId = null;
     private int totalBitsForParent = 0;
+    private transient Color visualColor = null;
     private boolean isReturningToSource = false;
     private Port originalSourcePort = null;
     private transient SystemNode lastVisitedSystem;
-
+    private PacketType originalType = null;
+    private PacketType emulatedMovementType = null;
 
     public Packet(PacketType type, double initialX, double initialY) {
         this.id = UUID.randomUUID().toString();
@@ -49,6 +53,8 @@ public class Packet {
         this.x = initialX;
         this.y = initialY;
         this.velocity = new Vector2D();
+        this.originalType = null;
+
         if (type == PacketType.SQUARE) {
             this.initialSize = Config.PACKET_SQUARE_INITIAL_SIZE;
         } else if (type == PacketType.BIT_PACKET) {
@@ -60,11 +66,21 @@ public class Packet {
             this.initialSize = 10;
         } else if (type == PacketType.MESSENGER_INFINITY) {
             this.initialSize = Config.PACKET_MESSENGER_INITIAL_SIZE;
+        } else if (type == PacketType.CONFIDENTIAL_NORMAL) {
+            this.initialSize = Config.PACKET_CONFIDENTIAL_NORMAL_INITIAL_SIZE;
+        }
+        else if (type == PacketType.CONFIDENTIAL_DISTANCING) {
+            this.initialSize = Config.PACKET_CONFIDENTIAL_DISTANCING_INITIAL_SIZE;
+        }
+        else if (type == PacketType.PROTECTED) {
+            this.initialSize = 0;
         }
         else {
             this.initialSize = Config.PACKET_TRIANGLE_INITIAL_SIZE;
         }
+
         this.currentSize = this.initialSize;
+
         this.sizeLabel = new Label(String.valueOf(this.currentSize));
         this.sizeLabel.setFont(javafx.scene.text.Font.font("Arial", javafx.scene.text.FontWeight.BOLD, 9));
         this.sizeLabel.setTextFill(javafx.scene.paint.Color.WHITE);
@@ -107,6 +123,17 @@ public class Packet {
         this.inheritedStabilityDamage = 0.0;
         this.currentSegmentIndex = 0;
 
+        if (this.type == PacketType.PROTECTED) {
+            PacketType[] possibleMovements = {PacketType.SQUARE, PacketType.TRIANGLE, PacketType.MESSENGER_INFINITY};
+            this.emulatedMovementType = possibleMovements[new Random().nextInt(possibleMovements.length)];
+            System.out.println("Protected Packet " + id.substring(0,4) + " is now emulating movement of: " + this.emulatedMovementType);
+        } else {
+            this.emulatedMovementType = this.type;
+        }
+
+
+        PacketType movementType = this.emulatedMovementType;
+
         List<Point2D> path = connection.getFullPath();
         if (path.size() < 2) {
             this.isOffWire = true;
@@ -118,50 +145,36 @@ public class Packet {
         this.setX(startPoint.getX());
         this.setY(startPoint.getY());
 
-        boolean compatibleStart = (this.type == startPort.getPacketType());
+        boolean compatibleStart = (this.type == startPort.getPacketType() || this.type == PacketType.PROTECTED);
+
         double initialSpeedFactor;
 
-        if (this.type == PacketType.SQUARE) {
+        if (movementType == PacketType.SQUARE) {
             this.currentMaxSpeedOnWire = Config.BASE_PACKET_SPEED;
+            this.acceleration = 0;
             initialSpeedFactor = compatibleStart ? Config.SQUARE_COMPATIBLE_SPEED_FACTOR : Config.SQUARE_INCOMPATIBLE_SPEED_FACTOR;
-        } else if (this.type == PacketType.TRIANGLE) {
+        } else if (movementType == PacketType.TRIANGLE) {
             this.currentMaxSpeedOnWire = Config.BASE_PACKET_SPEED * (compatibleStart ? Config.TRIANGLE_COMPATIBLE_SPEED_FACTOR : Config.TRIANGLE_INCOMPATIBLE_MAX_SPEED_FACTOR);
             this.acceleration = compatibleStart ? 0 : Config.TRIANGLE_PACKET_ACCELERATION;
             initialSpeedFactor = compatibleStart ? Config.TRIANGLE_COMPATIBLE_INITIAL_SPEED_FACTOR : Config.TRIANGLE_INCOMPATIBLE_INITIAL_SPEED_FACTOR;
-        } else if (this.type == PacketType.MESSENGER_INFINITY) {
-            boolean isCompatibleStart = (this.startPort.getPacketType() == this.type ||
-                    this.startPort.getPacketType() == PacketType.SQUARE || // Assume it's compatible with basic types for simplicity
-                    this.startPort.getPacketType() == PacketType.TRIANGLE);
-
-            // This packet has constant acceleration from a compatible port
-            this.acceleration = isCompatibleStart ? Config.TRIANGLE_PACKET_ACCELERATION : -Config.TRIANGLE_PACKET_ACCELERATION;
-            this.currentMaxSpeedOnWire = Config.BASE_PACKET_SPEED * 1.2; // A bit faster max speed
-            initialSpeedFactor = 0.5; // Starts slower and accelerates
-
-            // This packet is not returning at the start
+        } else if (movementType == PacketType.MESSENGER_INFINITY) {
+            this.acceleration = Config.TRIANGLE_PACKET_ACCELERATION;
+            this.currentMaxSpeedOnWire = Config.BASE_PACKET_SPEED * 1.2;
+            initialSpeedFactor = 0.5;
             this.isReturningToSource = false;
-            this.originalSourcePort = this.startPort; // Remember its origin
+            this.originalSourcePort = this.startPort;
         } else {
-
             this.currentMaxSpeedOnWire = Config.BASE_PACKET_SPEED;
+            this.acceleration = 0;
             initialSpeedFactor = 1.0;
         }
 
-        if (this.stabilityOnWire < Config.STABILITY_THRESHOLD_FOR_SPEED_REDUCTION) {
-            initialSpeedFactor *= Math.max(Config.MIN_INITIAL_SPEED_FACTOR, Config.INTERMEDIATE_EXIT_SPEED_FACTOR_DAMAGED + this.stabilityOnWire);
-        }
 
         double initialSpeed = this.currentMaxSpeedOnWire * initialSpeedFactor;
-        initialSpeed = Math.min(initialSpeed, Config.ABSOLUTE_MAX_SPEED_AFTER_IMPACT);
-
         Vector2D direction = Vector2D.direction(
                 new Vector2D(startPoint.getX(), startPoint.getY()),
                 new Vector2D(nextPointInPath.getX(), nextPointInPath.getY())
         );
-        if (direction.magnitudeSquared() < 0.0001) {
-            direction = new Vector2D(1, 0);
-        }
-
         this.velocity.set(Vector2D.multiply(direction, initialSpeed));
 
         if (this.sizeLabel != null) {
@@ -172,6 +185,42 @@ public class Packet {
 
     public boolean update(double deltaTime, GameState gameState) {
         if (deltaTime <= 0) return false;
+
+        double effectiveDeltaTime = deltaTime;
+
+        if (this.type == PacketType.CONFIDENTIAL_NORMAL && !isOffWire) {
+            Port target = this.getTargetPort();
+            if (target != null && target.getParentSystem() != null) {
+                if (target.getParentSystem().getStoredPacketCount() > 0) {
+                    effectiveDeltaTime *= Config.CONFIDENTIAL_PACKET_SLOWDOWN_FACTOR;
+                }
+            }
+        }
+        else if (this.type == PacketType.CONFIDENTIAL_DISTANCING && !isOffWire) {
+            Vector2D totalForce = new Vector2D(0, 0);
+            for (Packet other : gameState.getPackets()) {
+                if (other == this || other.isOffWire()) continue;
+
+                double distance = this.getPosition().distance(other.getPosition());
+
+                if (distance < 1.0) continue;
+
+                if (distance < Config.CONFIDENTIAL_PACKET_IDEAL_DISTANCE * 2) {
+                    double displacement = distance - Config.CONFIDENTIAL_PACKET_IDEAL_DISTANCE;
+
+                    double forceMagnitude = -displacement * Config.CONFIDENTIAL_PACKET_FORCE_STRENGTH * 0.05;
+
+                    if (Math.abs(forceMagnitude) > 5.0) {
+                        forceMagnitude = 5.0 * Math.signum(forceMagnitude);
+                    }
+
+                    Vector2D direction = Vector2D.direction(other.getPosition(), this.getPosition());
+                    totalForce.add(Vector2D.multiply(direction, forceMagnitude));
+                }
+            }
+            this.velocity.add(Vector2D.multiply(totalForce, effectiveDeltaTime));
+        }
+
 
         if (isOffWire) {
             this.x += velocity.getX() * deltaTime;
@@ -306,22 +355,18 @@ public class Packet {
         return false;
     }
 
-    // In Packet.java
     public void handleCollision() {
-        // The specific behavior for MESSENGER_INFINITY packet on collision
         if (this.type == PacketType.MESSENGER_INFINITY && !this.isReturningToSource) {
             System.out.println("Messenger packet collided! Returning to source.");
             this.isReturningToSource = true;
 
-            // Reverse direction and target
             Port temp = this.startPort;
             this.startPort = this.targetPort;
             this.targetPort = temp;
 
-            this.velocity.multiply(-1); // Reverse velocity
+            this.velocity.multiply(-1);
 
-            // We need to re-evaluate the path, which means resetting the segment index
-            this.currentSegmentIndex = 0; // Go to the beginning of the (now reversed) path
+            this.currentSegmentIndex = 0;
         }
     }
 
@@ -347,6 +392,22 @@ public class Packet {
         if (!isOffWire) {
             this.stabilityOnWire = Math.max(0, this.stabilityOnWire - Config.PACKET_STABILITY_REDUCTION_FACTOR_FROM_IMPACT);
         }
+    }
+
+    public void setOriginalType(PacketType type) {
+        this.originalType = type;
+        if (this.type == PacketType.PROTECTED) {
+            int originalSize = (type == PacketType.SQUARE) ? Config.PACKET_SQUARE_INITIAL_SIZE :
+                    (type == PacketType.TRIANGLE) ? Config.PACKET_TRIANGLE_INITIAL_SIZE :
+                            Config.PACKET_MESSENGER_INITIAL_SIZE;
+
+            this.currentSize = (int)(originalSize * Config.PROTECTED_PACKET_SIZE_MULTIPLIER);
+            updateLabelPosition();
+        }
+    }
+
+    public PacketType getOriginalType() {
+        return this.originalType;
     }
 
     public PacketType getType() { return type; }
@@ -430,6 +491,11 @@ public class Packet {
         this.lastVisitedSystem = system;
     }
 
+    public Vector2D getPosition() {
+        return new Vector2D(this.x, this.y);
+    }
+
+
     public int getCurrentSegmentIndex() {
         return currentSegmentIndex;
     }
@@ -437,6 +503,10 @@ public class Packet {
     public void setCurrentSegmentIndex(int index) {
         this.currentSegmentIndex = index;
     }
+
+    public Color getVisualColor() { return visualColor; }
+
+    public void setVisualColor(Color color) { this.visualColor = color; }
 
     public boolean isLargePacket() {
         return this.type == PacketType.LARGE_8 || this.type == PacketType.LARGE_10;
@@ -446,16 +516,16 @@ public class Packet {
         return totalBitsForParent;
     }
 
-    public void setTotalBitsForParent(int totalBitsForParent) {
-        this.totalBitsForParent = totalBitsForParent;
+    public void setTotalBitsForParent(int total) {
+        this.totalBitsForParent = total;
     }
 
     public String getParentLargePacketId() {
         return parentLargePacketId;
     }
 
-    public void setParentLargePacketId(String parentLargePacketId) {
-        this.parentLargePacketId = parentLargePacketId;
+    public void setParentLargePacketId(String id) {
+        this.parentLargePacketId = id;
     }
 
 }

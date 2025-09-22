@@ -5,22 +5,26 @@
   "initialWireLength": 7500.0,
   "systems": [
     {
-      "x": 60, "y": 300, "role": "SOURCE",
-      "ports": { "squareOutputs": 1, "triangleOutputs": 1, "messengerOutputs": 1 }
+      "x": 60, "y": 170, "role": "SOURCE",
+      "ports": { "squareOutputs": 2, "triangleOutputs": 1 }
+    },
+    {
+      "x": 60, "y": 330, "role": "SOURCE",
+      "ports": { "squareOutputs": 1 , "triangleOutputs": 1, "messengerOutputs": 1 }
     },
     {
       "x": 940, "y": 300, "role": "SINK",
-      "ports": { "squareInputs": 1, "triangleInputs": 1, "messengerInputs": 1 }
+      "ports": { "squareInputs": 1, "triangleInputs": 2, "messengerInputs": 1 }
     },
     {
       "x": 250, "y": 100, "role": "VPN",
       "comment": "مسیر امن برای محافظت از پکت‌های مثلثی",
-      "ports": { "triangleInputs": 1, "triangleOutputs": 1 }
+      "ports": { "squareInputs": 1, "triangleInputs": 1, "squareOutputs": 1 , "messengerOutputs": 1 }
     },
     {
-      "x": 450, "y": 500, "role": "SABOTEUR",
+      "x": 470, "y": 500, "role": "SABOTEUR",
       "comment": "یک تهدید در مسیر پایینی!",
-      "ports": { "squareInputs": 1, "squareOutputs": 1 }
+      "ports": { "squareInputs": 2, "squareOutputs": 1 , "triangleOutputs": 1 }
     },
     {
       "x": 250, "y": 500, "role": "SPY",
@@ -30,7 +34,7 @@
     {
       "x": 750, "y": 100, "role": "SPY",
       "comment": "جاسوس ۲: خروجی برای مسیر میان‌بر",
-      "ports": { "messengerOutputs": 1 }
+      "ports": { "squareInputs": 1 , "messengerOutputs": 1 }
     },
     {
       "x": 650, "y": 300, "role": "ANTI_TROJAN",
@@ -39,12 +43,17 @@
     {
       "x": 750, "y": 500, "role": "INTERMEDIATE",
       "comment": "گره اتصال پس از مسیر خطرناک",
-      "ports": { "squareInputs": 1, "messengerInputs": 1, "squareOutputs": 1, "messengerOutputs": 0 }
+      "ports": { "squareInputs": 1 , "triangleInputs": 1 , "squareOutputs": 1 }
     },
     {
       "x": 450, "y": 100, "role": "INTERMEDIATE",
       "comment": "سیستم کمکی برای مسیر بالایی (مثلثی)",
-      "ports": { "triangleInputs": 1, "triangleOutputs": 1 }
+      "ports": { "squareInputs": 1 , "messengerInputs": 1 , "triangleOutputs": 1 , "squareOutputs": 1 }
+    },
+    {
+      "x": 330, "y": 290, "role": "INTERMEDIATE",
+      "comment": "گره اتصال پس از مسیر خطرناک",
+      "ports": { "squareInputs": 2 , "triangleInputs": 1 , "squareOutputs": 2 , "triangleOutputs": 1 }
     }
   ]
 }

@@ -9,5 +9,7 @@ public enum PacketType {
     BIT_PACKET,
     LARGE_8,
     LARGE_10,
-    LARGE // <<< ویرگول انتهایی حذف شد
+    LARGE,
+    CONFIDENTIAL_NORMAL,
+    CONFIDENTIAL_DISTANCING
 }

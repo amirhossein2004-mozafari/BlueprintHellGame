@@ -1,0 +1,120 @@
+{
+  "coins": 204,
+  "systems": [
+    {
+      "role": "SOURCE",
+      "x": 50,
+      "y": 300
+    },
+    {
+      "role": "SINK",
+      "x": 900,
+      "y": 300
+    },
+    {
+      "role": "VPN",
+      "x": 230,
+      "y": 160
+    },
+    {
+      "role": "INTERMEDIATE",
+      "x": 700,
+      "y": 350
+    },
+    {
+      "role": "SPY",
+      "x": 300,
+      "y": 450
+    },
+    {
+      "role": "SPY",
+      "x": 650,
+      "y": 170
+    },
+    {
+      "role": "INTERMEDIATE",
+      "x": 500,
+      "y": 300
+    }
+  ],
+  "gameTimeElapsed": 92.53991280002465,
+  "levelNumber": 3,
+  "remainingWireLength": 5046.078759664213,
+  "connections": [
+    {
+      "bendPoints": [],
+      "largePassages": 0,
+      "startPortIdx": 3,
+      "startSysIdx": 0,
+      "endSysIdx": 6,
+      "endPortIdx": 2
+    },
+    {
+      "bendPoints": [{
+        "x": 300.79998779296875,
+        "y": 198.40000915527344
+      }],
+      "largePassages": 0,
+      "startPortIdx": 0,
+      "startSysIdx": 2,
+      "endSysIdx": 6,
+      "endPortIdx": 1
+    },
+    {
+      "bendPoints": [],
+      "largePassages": 2,
+      "startPortIdx": 0,
+      "startSysIdx": 4,
+      "endSysIdx": 6,
+      "endPortIdx": 0
+    },
+    {
+      "bendPoints": [],
+      "largePassages": 1,
+      "startPortIdx": 0,
+      "startSysIdx": 6,
+      "endSysIdx": 5,
+      "endPortIdx": 0
+    },
+    {
+      "bendPoints": [],
+      "largePassages": 1,
+      "startPortIdx": 1,
+      "startSysIdx": 6,
+      "endSysIdx": 3,
+      "endPortIdx": 0
+    },
+    {
+      "bendPoints": [],
+      "largePassages": 0,
+      "startPortIdx": 2,
+      "startSysIdx": 6,
+      "endSysIdx": 3,
+      "endPortIdx": 1
+    },
+    {
+      "bendPoints": [],
+      "largePassages": 1,
+      "startPortIdx": 0,
+      "startSysIdx": 3,
+      "endSysIdx": 1,
+      "endPortIdx": 0
+    },
+    {
+      "bendPoints": [],
+      "largePassages": 0,
+      "startPortIdx": 2,
+      "startSysIdx": 0,
+      "endSysIdx": 2,
+      "endPortIdx": 0
+    }
+  ],
+  "packets": [{
+    "x": 614.8512522520567,
+    "y": 370.034869750224,
+    "velY": 18.374145047953768,
+    "type": "MESSENGER_INFINITY",
+    "velX": 57.117342320496284,
+    "currentSize": 1
+  }]
+}
