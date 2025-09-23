@@ -9,7 +9,7 @@ import javafx.geometry.Point2D;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.shape.Line;
-
+import com.api.enums.AbilityType;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -85,7 +85,7 @@ public class GameController {
             spawnNewPackets(scaledDeltaTime);
         }
 
-        if (!gameState.isSkillActive(ShopSkill.AIRYAMAN)) {
+        if (!gameState.isSkillActive(AbilityType.AIRYAMAN)) {
             CollisionDetector.checkPacketPacketCollisions(gameState, gameState.getPackets());
         }
 
@@ -256,7 +256,7 @@ public class GameController {
         if (packet == null) {
             return "[NULL_PACKET_OBJECT]";
         }
-        String id = packet.getId();
+        String id = packet.getId().toString();
         if (id == null || id.isEmpty()) {
             return "[EMPTY_OR_NULL_ID]";
         }

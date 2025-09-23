@@ -9,6 +9,7 @@ import java.util.EnumMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import com.api.enums.AbilityType;
 
 public class GameState {
 
@@ -31,7 +32,7 @@ public class GameState {
     private double gameTimeElapsedSeconds;
     private final SimpleDoubleProperty gameTimeElapsedSecondsProperty;
 
-    private final Map<ShopSkill, DoubleProperty> activeSkillsDuration;
+    private final Map<AbilityType, DoubleProperty> activeSkillsDuration;
     private final BooleanProperty atarSkillActiveProperty;
     private final BooleanProperty airyamanSkillActiveProperty;
 
@@ -74,11 +75,11 @@ public class GameState {
         this.gameTimeElapsedSeconds = 0.0;
         this.gameTimeElapsedSecondsProperty = new SimpleDoubleProperty(0.0);
 
-        this.activeSkillsDuration = new EnumMap<>(ShopSkill.class);
+        this.activeSkillsDuration = new EnumMap<>(AbilityType.class);
         this.atarSkillActiveProperty = new SimpleBooleanProperty(false);
         this.airyamanSkillActiveProperty = new SimpleBooleanProperty(false);
-        for (ShopSkill skill : ShopSkill.values()) {
-            if (skill == ShopSkill.ATAR || skill == ShopSkill.AIRYAMAN) {
+        for (AbilityType skill : AbilityType.values()) {
+            if (skill == AbilityType.ATAR || skill == AbilityType.AIRYAMAN) {
                 activeSkillsDuration.put(skill, new SimpleDoubleProperty(0.0));
             }
         }
@@ -110,7 +111,7 @@ public class GameState {
     }
     private String getPacketIdSafeForGameState(Packet packet) {
         if (packet == null) return "[NULL_PACKET_IN_GS]";
-        String id = packet.getId();
+        String id = packet.getId().toString();
         if (id == null || id.isEmpty()) return "[NO_ID_IN_GS]";
         return (id.length() < 4) ? id : id.substring(0, 4);
     }
@@ -215,36 +216,36 @@ public class GameState {
     public void updateAllPortsConnectedStatus(boolean status) { allPortsConnectedProperty.set(status); }
     public BooleanProperty allPortsConnectedProperty() { return allPortsConnectedProperty; }
 
-    public void activateSkill(ShopSkill skill, double durationSeconds) {
-        if (skill == null) return;
-        if (skill == ShopSkill.ANAHITA) {
+    public void activateSkill(AbilityType ability, double durationSeconds) {
+        if (ability == null) return;
+        if (ability == AbilityType.ANAHITA) {
             applyAnahitaEffect();
             return;
         }
-        DoubleProperty currentDurationProp = activeSkillsDuration.computeIfAbsent(skill, k -> new SimpleDoubleProperty(0.0));
+        DoubleProperty currentDurationProp = activeSkillsDuration.computeIfAbsent(ability, k -> new SimpleDoubleProperty(0.0));
         currentDurationProp.set(durationSeconds);
-        if (skill == ShopSkill.ATAR) atarSkillActiveProperty.set(true);
-        if (skill == ShopSkill.AIRYAMAN) airyamanSkillActiveProperty.set(true);
+        if (ability == AbilityType.ATAR) atarSkillActiveProperty.set(true);
+        if (ability == AbilityType.AIRYAMAN) airyamanSkillActiveProperty.set(true);
     }
 
-    public boolean isSkillActive(ShopSkill skill) {
-        if (skill == null || !activeSkillsDuration.containsKey(skill)) return false;
-        return activeSkillsDuration.get(skill).get() > 0;
+    public boolean isSkillActive(AbilityType ability) {
+        if (ability == null || !activeSkillsDuration.containsKey(ability)) return false;
+        return activeSkillsDuration.get(ability).get() > 0;
     }
 
     public void updateActiveSkills(double deltaTime) {
         if (deltaTime <= 0) return;
-        Iterator<Map.Entry<ShopSkill, DoubleProperty>> iterator = activeSkillsDuration.entrySet().iterator();
+        Iterator<Map.Entry<AbilityType, DoubleProperty>> iterator = activeSkillsDuration.entrySet().iterator();
         while (iterator.hasNext()) {
-            Map.Entry<ShopSkill, DoubleProperty> entry = iterator.next();
-            ShopSkill skill = entry.getKey();
+            Map.Entry<AbilityType, DoubleProperty> entry = iterator.next();
+            AbilityType ability = entry.getKey();
             DoubleProperty durationProp = entry.getValue();
             if (durationProp.get() > 0) {
                 double newDuration = durationProp.get() - deltaTime;
                 if (newDuration <= 0) {
                     durationProp.set(0);
-                    if (skill == ShopSkill.ATAR) atarSkillActiveProperty.set(false);
-                    if (skill == ShopSkill.AIRYAMAN) airyamanSkillActiveProperty.set(false);
+                    if (ability == AbilityType.ATAR) atarSkillActiveProperty.set(false);
+                    if (ability == AbilityType.AIRYAMAN) airyamanSkillActiveProperty.set(false);
                 } else {
                     durationProp.set(newDuration);
                 }

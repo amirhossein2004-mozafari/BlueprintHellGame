@@ -1,12 +1,14 @@
 package com.blueprinthell;
 
+import com.api.dto.SystemDTO;
 import com.controller.*;
 import com.model.GameState;
-import com.utils.LevelLoader;
-import com.utils.SaveManager;
+import com.model.SystemNode;
+import com.utils.*;
 import com.view.*;
 import javafx.animation.AnimationTimer;
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -16,6 +18,10 @@ import javafx.scene.control.Label;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.BorderPane;
 import javafx.stage.Stage;
+
+import java.io.IOException;
+import java.net.Socket;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -26,7 +32,6 @@ import com.controller.ShopController;
 import com.view.ShopView;
 import javafx.scene.layout.BorderPane;
 import com.view.LevelSelectionView;
-import com.utils.AudioManager;
 import com.view.SettingsView;
 import com.controller.SettingsController;
 
@@ -55,30 +60,69 @@ public class MainApplication extends Application {
         this.settingsControllerInstance = new SettingsController();
         AudioManager.loadSounds();
 
-        GameState savedGame = SaveManager.loadGame();
-        if (savedGame != null) {
-            Alert confirmationAlert = new Alert(Alert.AlertType.CONFIRMATION);
-            confirmationAlert.setTitle("بازیابی بازی");
-            confirmationAlert.setHeaderText("یک فایل ذخیره پیدا شد.");
-            confirmationAlert.setContentText("آیا می خواهید بازی را از نقطه ذخیره شده ادامه دهید؟");
+        boolean isOnline = NetworkManager.getInstance().connect();
 
-            ButtonType yesButton = new ButtonType("بله، ادامه بده");
-            ButtonType noButton = new ButtonType("نه، بازی جدید");
-            confirmationAlert.getButtonTypes().setAll(yesButton, noButton);
+        if (isOnline) {
+            System.out.println("Client is online. Waiting for initial game state from server...");
 
-            Optional<ButtonType> result = confirmationAlert.showAndWait();
+            String serverJson = NetworkManager.getInstance().readMessage();
 
-            if (result.isPresent() && result.get() == yesButton) {
-                startGameWithLoadedState(savedGame);
-                primaryStage.show();
-                return;
+            if (serverJson != null && !serverJson.startsWith("ERROR")) {
+
+                List<SystemDTO> systemDTOs = SerializationManager.fromJsonToSystemDTOs(serverJson);
+
+                this.gameState = new GameState(1, 0, 0);
+
+                for (SystemDTO dto : systemDTOs) {
+                    SystemNode node = SerializationManager.fromDTO(dto);
+                    gameState.addSystem(node);
+                }
+
+                System.out.println("Successfully built client-side game state from server data.");
+
+                setupGameScene();
+
             } else {
-                SaveManager.deleteSaveFile();
+                Alert errorAlert = new Alert(Alert.AlertType.ERROR);
+                errorAlert.setTitle("خطای سرور");
+                errorAlert.setHeaderText("ارتباط با سرور برقرار نشد یا با خطا مواجه شد.");
+                errorAlert.setContentText("لطفاً برنامه را بسته و دوباره تلاش کنید.");
+                errorAlert.showAndWait();
+                Platform.exit();
             }
+
+        } else {
+            Alert offlineAlert = new Alert(Alert.AlertType.INFORMATION);
+            offlineAlert.setTitle("حالت آفلاین");
+            offlineAlert.setHeaderText("اتصال به سرور برقرار نشد.");
+            offlineAlert.setContentText("بازی در حالت آفلاین اجرا می‌شود. قابلیت‌های آنلاین غیرفعال خواهند بود.");
+            offlineAlert.showAndWait();
+
+            GameState savedGame = SaveManager.loadGame();
+            if (savedGame != null) {
+                Alert confirmationAlert = new Alert(Alert.AlertType.CONFIRMATION);
+                confirmationAlert.setTitle("بازیابی بازی");
+                confirmationAlert.setHeaderText("یک فایل ذخیره پیدا شد.");
+                confirmationAlert.setContentText("آیا می خواهید بازی را از نقطه ذخیره شده ادامه دهید؟");
+
+                ButtonType yesButton = new ButtonType("بله، ادامه بده");
+                ButtonType noButton = new ButtonType("نه، بازی جدید");
+                confirmationAlert.getButtonTypes().setAll(yesButton, noButton);
+
+                Optional<ButtonType> result = confirmationAlert.showAndWait();
+                if (result.isPresent() && result.get() == yesButton) {
+                    startGameWithLoadedState(savedGame);
+                    primaryStage.show();
+                    return;
+                } else {
+                    SaveManager.deleteSaveFile();
+                }
+            }
+
+            AudioManager.playMenuBackgroundMusic(true);
+            showMainMenu(new MenuController(this));
         }
 
-        AudioManager.playMenuBackgroundMusic(true);
-        showMainMenu(new MenuController(this));
         primaryStage.show();
     }
 
@@ -531,10 +575,14 @@ public class MainApplication extends Application {
         if (shopControllerInstance != null) shopControllerInstance = null;
     }
 
+
+
     public Stage getPrimaryStage() { return primaryStage; }
     public GameState getGameState() { return gameState; }
 
     public static void main(String[] args) {
         launch(args);
     }
+
+
 }

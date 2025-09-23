@@ -3,6 +3,8 @@ package com.model;
 import javafx.geometry.Point2D;
 import javafx.scene.shape.Shape;
 
+import java.util.UUID;
+
 public class Port {
 
     private final SystemNode parentSystem;
@@ -11,12 +13,18 @@ public class Port {
     private final Point2D relativePosition;
     private transient Shape visualShape = null;
     private Connection connectedConnection = null;
+    private final UUID id;
 
     public Port(SystemNode parent, PortType type, PacketType packetType, Point2D relativePosition) {
         this.parentSystem = parent;
         this.type = type;
         this.packetType = packetType;
         this.relativePosition = relativePosition;
+        this.id = UUID.randomUUID();
+    }
+
+    public UUID getId() {
+        return this.id;
     }
 
     public Connection getConnectedConnection() {

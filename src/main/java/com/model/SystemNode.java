@@ -28,6 +28,7 @@ public class SystemNode {
     private static final double ANTI_TROJAN_COOLDOWN_SECONDS = 10.0;
     private final Map<String, List<Packet>> receivedBitPackets = new HashMap<>();
     private final List<Packet> packetsToSend = new ArrayList<>();
+    private UUID id;
 
     public SystemNode(double x, double y, SystemRole role,
                       int numSqIn, int numTriIn, int numLgIn, int numMsgIn,
@@ -39,6 +40,7 @@ public class SystemNode {
         this.storedPackets = new ArrayList<>();
         createSpecificPorts(numSqIn, numTriIn, numLgIn, numMsgIn, numSqOut, numTriOut, numLgOut, numMsgOut);
         validatePortsBasedOnRole();
+        this.id = UUID.randomUUID();
     }
 
 
@@ -183,7 +185,7 @@ public class SystemNode {
         else if (this.role == SystemRole.DISTRIBUTE) {
             if (packet.isLargePacket()) {
                 final int numberOfBits = packet.getInitialSize();
-                final String parentId = packet.getId();
+                final String parentId = packet.getId().toString();
                 Color batchColor = Color.rgb(random.nextInt(156) + 100, random.nextInt(156) + 100, random.nextInt(156) + 100);
                 for (int i = 0; i < numberOfBits; i++) {
                     Connection exit = findAnyFreeOutputConnection(this, gameState);
@@ -575,6 +577,14 @@ public class SystemNode {
         this.x = x;
         this.y = y;
 
+    }
+
+    public UUID getId() {
+        return this.id;
+    }
+
+    public void setId(UUID id) {
+        this.id = id;
     }
 
     public double getX() { return x; }

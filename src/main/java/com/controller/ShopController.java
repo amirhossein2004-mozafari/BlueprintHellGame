@@ -1,11 +1,10 @@
 package com.controller;
 
-import com.blueprinthell.Config;
 import com.blueprinthell.MainApplication;
 import com.model.EffectType;
 import com.model.GameState;
-import com.model.ShopSkill;
 import com.utils.AudioManager;
+import com.api.enums.AbilityType;
 
 public class ShopController {
 
@@ -19,35 +18,35 @@ public class ShopController {
         this.gameController = gameController;
     }
 
-    public void buySkill(ShopSkill skill, double duration, int cost) {
+    public void buySkill(AbilityType ability, double duration, int cost) {
         if (gameState == null) {
             System.err.println("ShopController Error: GameState is null. Cannot process skill purchase.");
             return;
         }
 
-        System.out.println("ShopController: Attempting to buy skill - " + skill.name() +
+        System.out.println("ShopController: Attempting to buy skill - " + ability.name() +
                 ", Cost: " + cost + ", Current Coins: " + gameState.getCoins());
 
         if (gameState.getCoins() >= cost) {
-            if ((skill == ShopSkill.ATAR && gameState.isSkillActive(ShopSkill.ATAR)) ||
-                    (skill == ShopSkill.AIRYAMAN && gameState.isSkillActive(ShopSkill.AIRYAMAN))) {
-                System.out.println("ShopController: Skill " + skill.name() + " is already active. Purchase aborted by controller.");
+            if ((ability == AbilityType.ATAR && gameState.isSkillActive(AbilityType.ATAR)) ||
+                    (ability == AbilityType.AIRYAMAN && gameState.isSkillActive(AbilityType.AIRYAMAN))) {
+                System.out.println("ShopController: Skill " + ability.name() + " is already active. Purchase aborted by controller.");
                 return;
             }
 
             if (gameState.decreaseCoins(cost)) {
-                gameState.activateSkill(skill, duration);
+                gameState.activateSkill(ability, duration);
 
                 AudioManager.playSoundEffect(AudioManager.SFX_SHOP_BUY);
 
-                System.out.println("ShopController: Skill " + skill.name() + " purchased and activated successfully!");
+                System.out.println("ShopController: Skill " + ability.name() + " purchased and activated successfully!");
 
             } else {
-                System.err.println("ShopController Error: Could not decrease coins for skill " + skill.name() +
+                System.err.println("ShopController Error: Could not decrease coins for skill " + ability.name() +
                         " even though player had enough. Purchase failed.");
             }
         } else {
-            System.out.println("ShopController: Not enough coins to buy " + skill.name() +
+            System.out.println("ShopController: Not enough coins to buy " + ability.name() +
                     ". Required: " + cost + ", Available: " + gameState.getCoins());
         }
     }

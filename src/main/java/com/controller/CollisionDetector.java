@@ -3,7 +3,6 @@ package com.controller;
 import com.model.GameState;
 import com.model.Packet;
 import com.model.Vector2D;
-import com.model.ShopSkill;
 import com.blueprinthell.Config;
 import com.utils.AudioManager;
 import javafx.geometry.Bounds;
@@ -11,12 +10,13 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import com.api.enums.AbilityType;
 
 public class CollisionDetector {
 
     public static void checkPacketPacketCollisions(GameState gameState, List<Packet> activePackets) {
         if (gameState == null || activePackets == null || activePackets.size() < 2) return;
-        if (gameState.isSkillActive(ShopSkill.AIRYAMAN)) return;
+        if (gameState.isSkillActive(AbilityType.AIRYAMAN)) return;
 
         List<Packet> packetsToCheck = new ArrayList<>(activePackets);
 
@@ -63,7 +63,7 @@ public class CollisionDetector {
                     packet1.handleCollision();
                     packet2.handleCollision();
 
-                    if (!gameState.isSkillActive(ShopSkill.ATAR)) {
+                    if (!gameState.isSkillActive(AbilityType.ATAR)) {
                         double colX = (packet1.getX() + packet2.getX()) / 2.0;
                         double colY = (packet1.getY() + packet2.getY()) / 2.0;
                         Vector2D colPoint = new Vector2D(colX, colY);

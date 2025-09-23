@@ -4,7 +4,6 @@ import com.blueprinthell.Config;
 import com.controller.ShopController;
 import com.model.EffectType;
 import com.model.GameState;
-import com.model.ShopSkill;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.geometry.Insets;
@@ -17,6 +16,7 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.paint.Color;
 import javafx.beans.binding.Bindings;
+import com.api.enums.AbilityType;
 
 public class ShopView extends BorderPane {
 
@@ -66,7 +66,7 @@ public class ShopView extends BorderPane {
                 "(Atar)",
                 "اثر موج‌های Impact را برای " + (int)Config.ATAR_SKILL_DURATION_SECONDS + " ثانیه غیرفعال می‌کند.",
                 Config.ATAR_SKILL_COST,
-                ShopSkill.ATAR,
+                AbilityType.ATAR,
                 Config.ATAR_SKILL_DURATION_SECONDS,
                 gameState.atarSkillActiveProperty()
         ));
@@ -75,7 +75,7 @@ public class ShopView extends BorderPane {
                 "(Airyaman)",
                 "برخورد پاکت‌های موجود در شبکه را برای " + (int)Config.AIRYAMAN_SKILL_DURATION_SECONDS + " ثانیه غیرفعال می‌کند.",
                 Config.AIRYAMAN_SKILL_COST,
-                ShopSkill.AIRYAMAN,
+                AbilityType.AIRYAMAN,
                 Config.AIRYAMAN_SKILL_DURATION_SECONDS,
                 gameState.airyamanSkillActiveProperty()
         ));
@@ -84,7 +84,7 @@ public class ShopView extends BorderPane {
                 "(Anahita)",
                 "نویز تمام پاکت‌های حاضر در شبکه را صفر می‌کند.",
                 Config.ANAHITA_SKILL_COST,
-                ShopSkill.ANAHITA,
+                AbilityType.ANAHITA,
                 0,
                 null
         ));
@@ -120,7 +120,7 @@ public class ShopView extends BorderPane {
         System.out.println("ShopView: UI fully constructed with all skill entries.");
     }
 
-    private VBox createSkillEntryView(String name, String description, int cost, ShopSkill skillEnum, double duration, BooleanProperty activeProperty) {
+    private VBox createSkillEntryView(String name, String description, int cost, AbilityType ability, double duration, BooleanProperty activeProperty) {
         VBox skillBox = new VBox(5);
         skillBox.setPadding(new Insets(10));
         skillBox.setAlignment(Pos.CENTER_LEFT);
@@ -144,8 +144,8 @@ public class ShopView extends BorderPane {
         Button buyButton = new Button("خرید");
         styleButton(buyButton);
         buyButton.setOnAction(e -> {
-            System.out.println("ShopView: Buy button clicked for " + skillEnum.name());
-            this.shopController.buySkill(skillEnum, duration, cost);
+            System.out.println("ShopView: Buy button clicked for " + ability.name());
+            this.shopController.buySkill(ability, duration, cost);
         });
 
         buyButton.disableProperty().bind(

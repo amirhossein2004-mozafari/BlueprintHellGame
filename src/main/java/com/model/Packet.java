@@ -30,8 +30,8 @@ public class Packet {
     private double noiseLevel;
     private double stabilityOnWire;
     private boolean isOffWire;
-    private final String id;
-    private Map<String, Double> collisionCooldownWithPackets;
+    private final UUID id;
+    private Map<UUID, Double> collisionCooldownWithPackets;
     private double currentMaxSpeedOnWire;
     private double inheritedStabilityDamage = 0.0;
     private double timeSpentIdleOffWireSeconds = 0.0;
@@ -47,7 +47,7 @@ public class Packet {
     private PacketType emulatedMovementType = null;
 
     public Packet(PacketType type, double initialX, double initialY) {
-        this.id = UUID.randomUUID().toString();
+        this.id = UUID.randomUUID();
         this.collisionCooldownWithPackets = new HashMap<>();
         this.type = type;
         this.x = initialX;
@@ -126,8 +126,7 @@ public class Packet {
         if (this.type == PacketType.PROTECTED) {
             PacketType[] possibleMovements = {PacketType.SQUARE, PacketType.TRIANGLE, PacketType.MESSENGER_INFINITY};
             this.emulatedMovementType = possibleMovements[new Random().nextInt(possibleMovements.length)];
-            System.out.println("Protected Packet " + id.substring(0,4) + " is now emulating movement of: " + this.emulatedMovementType);
-        } else {
+            System.out.println("Protected Packet " + id.toString().substring(0, 4) + " is now emulating movement of: " + this.emulatedMovementType);        } else {
             this.emulatedMovementType = this.type;
         }
 
@@ -371,8 +370,7 @@ public class Packet {
     }
 
     private String getPacketIdSafe() {
-        if (this.id == null || this.id.isEmpty()) return "[NO_ID]";
-        return (this.id.length() < 4) ? this.id : this.id.substring(0,4);
+        return (this.id != null) ? this.id.toString().substring(0, 4) : "[NO_ID]";
     }
 
     public void applyImpactForce(Vector2D force) {
@@ -441,20 +439,38 @@ public class Packet {
     public double getStabilityOnWire() { return stabilityOnWire; }
     public void setStabilityOnWire(double stability) { this.stabilityOnWire = Math.max(0,Math.min(1.0,stability));}
     public boolean isOffWire() { return isOffWire; }
-    public String getId() { return id; }
+
+    public UUID getId() {
+        return this.id;
+    }
+
     public boolean isOnCollisionCooldownWith(Packet otherPacket) {
         if (otherPacket == null || !this.collisionCooldownWithPackets.containsKey(otherPacket.getId())) return false;
+
         double cooldownEndTime = this.collisionCooldownWithPackets.get(otherPacket.getId());
         boolean stillOnCooldown = (System.nanoTime() / 1_000_000_000.0) < cooldownEndTime;
-        if (!stillOnCooldown) this.collisionCooldownWithPackets.remove(otherPacket.getId());
+
+        if (!stillOnCooldown) {
+            this.collisionCooldownWithPackets.remove(otherPacket.getId());
+        }
         return stillOnCooldown;
     }
+
     public void registerCollisionWith(Packet otherPacket) {
         if (otherPacket == null) return;
+
         double cooldownEndTime = System.nanoTime() / 1_000_000_000.0 + Config.PACKET_COLLISION_COOLDOWN_SECONDS;
+
         this.collisionCooldownWithPackets.put(otherPacket.getId(), cooldownEndTime);
         otherPacket.collisionCooldownWithPackets.put(this.id, cooldownEndTime);
     }
+
+    private String getPacketIdSafeForGameState(Packet packet) {
+        if (packet == null) return "[NULL_PACKET_IN_GS]";
+        UUID packetId = packet.getId();
+        return (packetId != null) ? packetId.toString().substring(0, 4) : "[NO_ID_IN_GS]";
+    }
+
     public void decreaseSize(int amount) {
         if (amount <= 0 || this.currentSize <= 0) return;
         this.currentSize = Math.max(0, this.currentSize - amount);
