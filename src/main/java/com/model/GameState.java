@@ -10,6 +10,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import com.api.enums.AbilityType;
+import java.util.UUID;
 
 public class GameState {
 
@@ -293,6 +294,27 @@ public class GameState {
         if (effectPoint != null) {
             this.effectPoints.add(effectPoint);
         }
+    }
+
+    public Port findPortById(UUID portId) {
+        if (portId == null) return null;
+        for (SystemNode system : systems) {
+            for (Port port : system.getInputPorts()) {
+                if (port.getId().equals(portId)) {
+                    return port;
+                }
+            }
+            for (Port port : system.getOutputPorts()) {
+                if (port.getId().equals(portId)) {
+                    return port;
+                }
+            }
+        }
+        return null;
+    }
+
+    public void clearConnectionsForSync() {
+        this.connections.clear();
     }
 
     public void setGameTimeElapsed(double time) {

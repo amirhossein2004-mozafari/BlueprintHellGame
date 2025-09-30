@@ -5,6 +5,8 @@ import com.model.EffectType;
 import com.model.GameState;
 import com.utils.AudioManager;
 import com.api.enums.AbilityType;
+import com.utils.NetworkManager;
+import org.json.JSONObject;
 
 public class ShopController {
 
@@ -24,31 +26,12 @@ public class ShopController {
             return;
         }
 
-        System.out.println("ShopController: Attempting to buy skill - " + ability.name() +
-                ", Cost: " + cost + ", Current Coins: " + gameState.getCoins());
+        System.out.println("ShopController: Attempting to send BUY_SKILL request for " + ability.name());
 
-        if (gameState.getCoins() >= cost) {
-            if ((ability == AbilityType.ATAR && gameState.isSkillActive(AbilityType.ATAR)) ||
-                    (ability == AbilityType.AIRYAMAN && gameState.isSkillActive(AbilityType.AIRYAMAN))) {
-                System.out.println("ShopController: Skill " + ability.name() + " is already active. Purchase aborted by controller.");
-                return;
-            }
+        JSONObject payload = new JSONObject();
+        payload.put("abilityType", ability.name());
 
-            if (gameState.decreaseCoins(cost)) {
-                gameState.activateSkill(ability, duration);
-
-                AudioManager.playSoundEffect(AudioManager.SFX_SHOP_BUY);
-
-                System.out.println("ShopController: Skill " + ability.name() + " purchased and activated successfully!");
-
-            } else {
-                System.err.println("ShopController Error: Could not decrease coins for skill " + ability.name() +
-                        " even though player had enough. Purchase failed.");
-            }
-        } else {
-            System.out.println("ShopController: Not enough coins to buy " + ability.name() +
-                    ". Required: " + cost + ", Available: " + gameState.getCoins());
-        }
+        NetworkManager.getInstance().sendAction("BUY_SKILL", payload);
     }
 
 

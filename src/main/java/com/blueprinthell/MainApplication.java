@@ -1,9 +1,10 @@
 package com.blueprinthell;
 
+import com.api.dto.PacketDTO;
 import com.api.dto.SystemDTO;
+import com.api.dto.WireDTO;
 import com.controller.*;
-import com.model.GameState;
-import com.model.SystemNode;
+import com.model.*;
 import com.utils.*;
 import com.view.*;
 import javafx.animation.AnimationTimer;
@@ -50,6 +51,7 @@ public class MainApplication extends Application {
     private int currentLevelNumberPlayed = 0;
     private GameState completedGameStateForGameOver;
     private AnimationTimer autoSaveTimer;
+    private GameState opponentGameState;
 
 
     @Override
@@ -63,34 +65,47 @@ public class MainApplication extends Application {
         boolean isOnline = NetworkManager.getInstance().connect();
 
         if (isOnline) {
-            System.out.println("Client is online. Waiting for initial game state from server...");
+            new Thread(() -> {
+                String serverMessage;
+                try {
+                    while ((serverMessage = NetworkManager.getInstance().readMessage()) != null) {
 
-            String serverJson = NetworkManager.getInstance().readMessage();
+                        String[] parts = serverMessage.split(":", 2);
+                        if (parts.length < 2) continue;
 
-            if (serverJson != null && !serverJson.startsWith("ERROR")) {
+                        String command = parts[0];
+                        String jsonData = parts[1];
 
-                List<SystemDTO> systemDTOs = SerializationManager.fromJsonToSystemDTOs(serverJson);
+                        switch (command) {
+                            case "GAME_ID":
+                                System.out.println("Client assigned Game ID: " + jsonData);
+                                break;
 
-                this.gameState = new GameState(1, 0, 0);
+                            case "UPDATE_SYSTEMS":
+                                List<SystemDTO> systemDTOs = SerializationManager.fromJsonToSystemDTOs(jsonData);
+                                Platform.runLater(() -> updateSystemsOnScreen(systemDTOs));
+                                break;
 
-                for (SystemDTO dto : systemDTOs) {
-                    SystemNode node = SerializationManager.fromDTO(dto);
-                    gameState.addSystem(node);
+                            case "UPDATE_PACKETS":
+                                List<PacketDTO> packetDTOs = SerializationManager.fromJsonToPacketDTOs(jsonData);
+                                Platform.runLater(() -> updatePacketsOnScreen(packetDTOs));
+                                break;
+
+                            case "UPDATE_WIRES":
+                                List<WireDTO> wireDTOs = SerializationManager.fromJsonToWireDTOs(jsonData);
+                                Platform.runLater(() -> updateWiresOnScreen(wireDTOs));
+                                break;
+
+                            case "UPDATE_OPPONENT_SYSTEMS":
+                                List<SystemDTO> opponentSystemDTOs = SerializationManager.fromJsonToSystemDTOs(jsonData);
+                                Platform.runLater(() -> updateOpponentSystemsOnScreen(opponentSystemDTOs));
+                                break;
+                        }
+                    }
+                } catch (Exception e) {
+                    System.err.println("Lost connection to server: " + e.getMessage());
                 }
-
-                System.out.println("Successfully built client-side game state from server data.");
-
-                setupGameScene();
-
-            } else {
-                Alert errorAlert = new Alert(Alert.AlertType.ERROR);
-                errorAlert.setTitle("خطای سرور");
-                errorAlert.setHeaderText("ارتباط با سرور برقرار نشد یا با خطا مواجه شد.");
-                errorAlert.setContentText("لطفاً برنامه را بسته و دوباره تلاش کنید.");
-                errorAlert.showAndWait();
-                Platform.exit();
-            }
-
+            }).start();
         } else {
             Alert offlineAlert = new Alert(Alert.AlertType.INFORMATION);
             offlineAlert.setTitle("حالت آفلاین");
@@ -523,7 +538,7 @@ public class MainApplication extends Application {
 
 
         if (!this.gameState.getConnections().isEmpty()) {
-            gameView.redrawAll(gameState);
+            gameView.redrawAll(gameState, opponentGameState);
         } else {
             gameController.initializeGame();
         }
@@ -576,6 +591,85 @@ public class MainApplication extends Application {
     }
 
 
+    private void updateSystemsOnScreen(List<SystemDTO> systemDTOs) {
+        if (gameState == null) {
+            gameState = new GameState(1, 0, 0);
+            for (SystemDTO dto : systemDTOs) {
+                SystemNode node = SerializationManager.fromDTO(dto);
+                node.setId(dto.getId());
+                gameState.addSystem(node);
+            }
+            setupGameScene();
+            primaryStage.show();
+        } else {
+            gameState.clearSystems();
+            for (SystemDTO dto : systemDTOs) {
+                SystemNode node = SerializationManager.fromDTO(dto);
+                node.setId(dto.getId());
+                gameState.addSystem(node);
+            }
+            if (gameView != null) {
+                gameView.redrawAll(gameState, opponentGameState);
+            }
+        }
+    }
+
+    private void updatePacketsOnScreen(List<PacketDTO> packetDTOs) {
+        if (gameState == null || gameView == null) {
+            return;
+        }
+
+        gameState.clearPackets();
+
+        for (PacketDTO dto : packetDTOs) {
+            Packet newPacket = SerializationManager.fromDTO(dto);
+            if (newPacket != null) {
+                gameState.addPacket(newPacket);
+            }
+        }
+
+        gameView.updatePacketPositions(gameState);
+    }
+
+
+    private void updateWiresOnScreen(List<WireDTO> wireDTOs) {
+        if (gameState == null || gameView == null) {
+            return;
+        }
+
+        gameState.clearConnectionsForSync();
+
+        for (WireDTO dto : wireDTOs) {
+            Port startPort = gameState.findPortById(dto.getSourceId());
+            Port endPort = gameState.findPortById(dto.getDestinationId());
+
+            if (startPort != null && endPort != null) {
+                Connection newConnection = new Connection(startPort, endPort);
+                newConnection.setId(dto.getId());
+                gameState.addConnection(newConnection);
+            } else {
+                System.err.println("Client: Could not create wire. A port was not found.");
+            }
+        }
+
+        gameView.redrawAll(gameState, opponentGameState);
+    }
+
+
+    private void updateOpponentSystemsOnScreen(List<SystemDTO> opponentSystemDTOs) {
+        if (opponentGameState == null) {
+            opponentGameState = new GameState();
+        }
+        opponentGameState.clearSystems();
+        for (SystemDTO dto : opponentSystemDTOs) {
+            SystemNode node = SerializationManager.fromDTO(dto);
+            node.setId(dto.getId());
+            opponentGameState.addSystem(node);
+        }
+        if (gameView != null) {
+            gameView.redrawAll(gameState, opponentGameState);
+        }
+    }
 
     public Stage getPrimaryStage() { return primaryStage; }
     public GameState getGameState() { return gameState; }

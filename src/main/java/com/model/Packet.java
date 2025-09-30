@@ -5,7 +5,6 @@ import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.geometry.Point2D;
 
-import java.awt.*;
 import java.util.*;
 import java.util.List;
 
@@ -30,7 +29,7 @@ public class Packet {
     private double noiseLevel;
     private double stabilityOnWire;
     private boolean isOffWire;
-    private final UUID id;
+    private UUID id;
     private Map<UUID, Double> collisionCooldownWithPackets;
     private double currentMaxSpeedOnWire;
     private double inheritedStabilityDamage = 0.0;
@@ -542,6 +541,10 @@ public class Packet {
 
     public void setParentLargePacketId(String id) {
         this.parentLargePacketId = id;
+    }
+
+    public void setId(UUID id) {
+        this.id = id;
     }
 
 }

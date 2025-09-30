@@ -30,14 +30,21 @@ public class GameView extends Pane {
         System.out.println("GameView constructed. PrefWidth: " + getPrefWidth() + " MinWidth: " + getMinWidth());
     }
 
-    public void redrawAll(GameState gameState) {
+    public void redrawAll(GameState myGameState, GameState opponentGameState) {
         this.getChildren().clear();
         packetNodes.clear();
         portShapes.clear();
-        drawConnections(gameState.getConnections());
-        drawSystems(gameState.getSystems());
-        drawEffectPoints(gameState.getEffectPoints());
-        drawPackets(gameState.getPackets());
+        if (opponentGameState != null) {
+            for (SystemNode system : opponentGameState.getSystems()) {
+                drawSingleSystem(system, 0.3);
+            }
+        }
+
+        drawConnections(myGameState.getConnections());
+        drawSystems(myGameState.getSystems());
+        drawPackets(myGameState.getPackets());
+        drawEffectPoints(myGameState.getEffectPoints());
+
     }
 
     private void drawConnections(List<Connection> connections) {
@@ -97,13 +104,17 @@ public class GameView extends Pane {
 
 
 
-    private void drawSingleSystem(SystemNode system) {
+    private void drawSingleSystem(SystemNode system, double opacity) {
 
         Rectangle systemBody = new Rectangle(system.getX(), system.getY(), system.getWidth(), system.getHeight());
 
 
         Color bodyColor;
-        if (system.getRole() == SystemRole.VPN) {
+        if (system.isOnCooldown()) {
+            bodyColor = Color.DARKSLATEGRAY;
+        } else if (system.isControllable()) {
+            bodyColor = Color.rgb(100, 50, 150);
+        } else if (system.getRole() == SystemRole.VPN) {
             bodyColor = Color.STEELBLUE;
         } else if (system.getRole() == SystemRole.SABOTEUR) {
             bodyColor = Color.FIREBRICK;
@@ -119,7 +130,7 @@ public class GameView extends Pane {
             bodyColor = Config.COLOR_SYSTEM_RECT;
         }
         systemBody.setFill(bodyColor);
-
+        systemBody.setOpacity(opacity);
         systemBody.setStroke(Color.BLACK);
         systemBody.setStrokeWidth(1);
         systemBody.setArcWidth(Config.SYSTEM_CORNER_ARC);
@@ -163,6 +174,10 @@ public class GameView extends Pane {
             storedCountLabel.setMouseTransparent(true);
             this.getChildren().add(storedCountLabel);
         }
+    }
+
+    private void drawSingleSystem(SystemNode system) {
+        drawSingleSystem(system, 1.0);
     }
 
     private void drawPortsForSystem(List<Port> ports) {

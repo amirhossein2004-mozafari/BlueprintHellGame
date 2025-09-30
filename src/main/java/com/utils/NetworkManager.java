@@ -7,6 +7,7 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import org.json.JSONObject;
 
 public class NetworkManager {
     private Socket socket;
@@ -58,4 +59,14 @@ public class NetworkManager {
             e.printStackTrace();
         }
     }
+
+    public void sendAction(String action, JSONObject payload) {
+        if (out != null) {
+            JSONObject command = new JSONObject();
+            command.put("action", action);
+            command.put("payload", payload);
+            sendMessage(command.toString());
+        }
+    }
+
 }

@@ -8,7 +8,7 @@ import java.util.UUID;
 
 public class Connection {
 
-    private final String id;
+    private UUID id;
     private final Port startPort;
     private final Port endPort;
 
@@ -25,7 +25,7 @@ public class Connection {
             throw new IllegalArgumentException("Connection must be from OUTPUT to INPUT port");
         }
 
-        this.id = UUID.randomUUID().toString();
+        this.id = UUID.randomUUID();
         this.startPort = startPort;
         this.endPort = endPort;
         this.bendPoints = new ArrayList<>();
@@ -77,12 +77,14 @@ public class Connection {
 
     public void registerLargePacketPassage() {
         this.largePacketPassages++;
-        System.out.println("Connection " + this.id.substring(0,4) + " has had " + this.largePacketPassages + " large packets pass.");
+        System.out.println("Connection " + this.id.toString().substring(0,4) + " has had " + this.largePacketPassages + " large packets pass.");
     }
 
 
+    public UUID getId() { return id; }
 
-    public String getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
+
     public Port getStartPort() { return startPort; }
     public Port getEndPort() { return endPort; }
     public double getLength() { return length; }

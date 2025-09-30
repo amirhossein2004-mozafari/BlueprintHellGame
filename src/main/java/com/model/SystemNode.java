@@ -29,6 +29,8 @@ public class SystemNode {
     private final Map<String, List<Packet>> receivedBitPackets = new HashMap<>();
     private final List<Packet> packetsToSend = new ArrayList<>();
     private UUID id;
+    private double cooldownRemaining = 0.0;
+    public static final double MULTIPLAYER_COOLDOWN_SECONDS = 5.0;
 
     public SystemNode(double x, double y, SystemRole role,
                       int numSqIn, int numTriIn, int numLgIn, int numMsgIn,
@@ -169,7 +171,7 @@ public class SystemNode {
 
         if ((this.role == SystemRole.SABOTEUR || this.role == SystemRole.SPY) && packet.getType() == PacketType.PROTECTED) {
             Packet revertedPacket = new Packet(packet.getOriginalType(), packet.getX(), packet.getY());
-            if(storedPackets.size() < Config.SYSTEM_PACKET_STORAGE_CAPACITY) {
+            if (storedPackets.size() < Config.SYSTEM_PACKET_STORAGE_CAPACITY) {
                 storedPackets.add(revertedPacket);
                 System.out.println("Protected packet has been reverted to " + revertedPacket.getType());
             } else {
@@ -198,6 +200,7 @@ public class SystemNode {
                         bitPacket.startMoving(exit);
                     }
                 }
+                return;
             } else {
                 if (storedPackets.size() < Config.SYSTEM_PACKET_STORAGE_CAPACITY) {
                     storedPackets.add(packet);
@@ -224,6 +227,7 @@ public class SystemNode {
                         receivedBitPackets.remove(parentId);
                     }
                 }
+                return;
             } else {
                 if (storedPackets.size() < Config.SYSTEM_PACKET_STORAGE_CAPACITY) {
                     storedPackets.add(packet);
@@ -235,8 +239,7 @@ public class SystemNode {
         else if (this.role == SystemRole.VPN || this.role == SystemRole.SPY || this.role == SystemRole.INTERMEDIATE || this.role == SystemRole.SABOTEUR) {
             if (packet.getType() == PacketType.BIT_PACKET) {
                 storedPackets.add(packet);
-            }
-            else if (storedPackets.size() < Config.SYSTEM_PACKET_STORAGE_CAPACITY) {
+            } else if (storedPackets.size() < Config.SYSTEM_PACKET_STORAGE_CAPACITY) {
                 storedPackets.add(packet);
             } else {
                 gameState.registerCompletelyLostPacket(packet);
@@ -245,6 +248,11 @@ public class SystemNode {
     }
 
     public void update(double deltaTime, GameState gameState) {
+
+        if (this.cooldownRemaining > 0) {
+            this.cooldownRemaining = Math.max(0, this.cooldownRemaining - deltaTime);
+        }
+
         if (gameState == null || storedPackets.isEmpty()) {
             return;
         }
@@ -555,6 +563,18 @@ public class SystemNode {
         }
     }
 
+    public boolean isControllable() {
+        return this.role == SystemRole.SOURCE;
+    }
+
+    public boolean isOnCooldown() {
+        return this.cooldownRemaining > 0;
+    }
+
+    public void startCooldown() {
+        this.cooldownRemaining = MULTIPLAYER_COOLDOWN_SECONDS;
+        System.out.println("System " + getId().toString().substring(0,4) + " is now on cooldown.");
+    }
 
     public void randomizePort() {
         List<Port> allPorts = new ArrayList<>();

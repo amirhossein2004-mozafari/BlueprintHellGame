@@ -4,16 +4,21 @@ import com.blueprinthell.Config;
 import com.blueprinthell.MainApplication;
 import com.model.*;
 import com.utils.AudioManager;
+import com.utils.NetworkManager;
 import com.view.GameView;
 import javafx.geometry.Point2D;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.shape.Line;
 import com.api.enums.AbilityType;
+import org.json.JSONObject;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
+import com.utils.NetworkManager;
+import org.json.JSONObject;
 
 public class GameController {
 
@@ -61,7 +66,7 @@ public class GameController {
         }
 
         if (gameView != null && gameState != null) {
-            gameView.redrawAll(gameState);
+            gameView.redrawAll(gameState, null);
         }
         checkAndSetAllPortsConnected();
         System.out.println("GameController.initializeGame: Game Initialized. Overall HUD ports connected: " + gameState.areAllPortsConnected());
@@ -325,62 +330,56 @@ public class GameController {
     }
 
     public void handleMousePress(MouseEvent event) {
+        if (gameView == null || gameState == null) {
+            return;
+        }
+        Point2D localClick = gameView.sceneToLocal(event.getSceneX(), event.getSceneY());
+
         if (isPlacingEffect) {
-            Point2D localClick = gameView.sceneToLocal(event.getSceneX(), event.getSceneY());
 
             if (effectToPlace == EffectType.AERGIA_NO_ACCELERATION) {
                 Connection clickedConnection = findClickedConnection(localClick.getX(), localClick.getY());
                 if (clickedConnection != null) {
                     System.out.println("Aergia effect placed on connection " + clickedConnection.getId());
-                    gameState.decreaseCoins(effectCost);
-
-                    EffectPoint newEffect = new EffectPoint(effectToPlace, clickedConnection, localClick, effectDuration);
-                    gameState.addEffectPoint(newEffect);
-
-                    gameView.redrawAll(gameState);
-                } else {
-                    System.out.println("Aergia placement cancelled: No wire was clicked.");
+                    if(gameState.decreaseCoins(effectCost)){
+                        EffectPoint newEffect = new EffectPoint(effectToPlace, clickedConnection, localClick, effectDuration);
+                        gameState.addEffectPoint(newEffect);
+                        gameView.redrawAll(gameState, null);
+                    }
                 }
-            }
-            else if (effectToPlace == EffectType.SISYPHUS_MOVE_SYSTEM) {
-                SystemNode clickedSystem = findClickedSystem(localClick.getX(), localClick.getY());
-
-                if (clickedSystem != null &&
-                        clickedSystem.getRole() != SystemRole.SOURCE &&
-                        clickedSystem.getRole() != SystemRole.SINK) {
-
-                    System.out.println("System " + clickedSystem.getRole() + " selected to be moved.");
-                    gameState.decreaseCoins(effectCost);
-
+            } else if (effectToPlace == EffectType.SISYPHUS_MOVE_SYSTEM) {
+                SystemNode clickedSys = findClickedSystem(localClick.getX(), localClick.getY());
+                if (clickedSys != null && clickedSys.getRole() != SystemRole.SOURCE && clickedSys.getRole() != SystemRole.SINK) {
                     this.isMovingSystem = true;
-                    this.systemToMove = clickedSystem;
-
-                } else {
-                    System.out.println("Sisyphus placement cancelled: A non-movable system (or nothing) was clicked.");
+                    this.systemToMove = clickedSys;
                 }
             }
-
             isPlacingEffect = false;
-
             return;
         }
 
-        if (gameView == null || gameState == null || isWiring || isDraggingBendPoint) {
+        if (isWiring || isDraggingBendPoint) {
             return;
         }
 
-        Point2D localClick = gameView.sceneToLocal(event.getSceneX(), event.getSceneY());
+        SystemNode clickedSystem = findClickedSystem(localClick.getX(), localClick.getY());
+        if (clickedSystem != null && clickedSystem.isControllable() && !clickedSystem.isOnCooldown()) {
+            System.out.println("Client: Clicked on a controllable system. Sending request to server.");
+            JSONObject payload = new JSONObject();
+            payload.put("systemId", clickedSystem.getId().toString());
+            NetworkManager.getInstance().sendAction("USE_CONTROLLABLE_SYSTEM", payload);
+            return;
+        }
 
         final double BEND_POINT_CLICK_RADIUS = 8.0;
         for (Connection conn : gameState.getConnections()) {
             List<Point2D> bendPoints = conn.getBendPoints();
             for (int i = 0; i < bendPoints.size(); i++) {
                 if (bendPoints.get(i).distance(localClick) < BEND_POINT_CLICK_RADIUS) {
-
                     isDraggingBendPoint = true;
                     activeConnection = conn;
                     activeBendPointIndex = i;
-                    System.out.println("Started dragging bend point " + i);
+                    System.out.println("Client: Started dragging bend point " + i + " on connection " + conn.getId().toString().substring(0,4));
                     return;
                 }
             }
@@ -388,7 +387,6 @@ public class GameController {
 
         Port clickedPort = findClickedPort(localClick.getX(), localClick.getY(), PortType.OUTPUT);
         if (clickedPort != null && !clickedPort.isConnected()) {
-
             isWiring = true;
             wiringStartPort = clickedPort;
             tempWire = new Line(clickedPort.getAbsoluteX(), clickedPort.getAbsoluteY(), localClick.getX(), localClick.getY());
@@ -401,15 +399,14 @@ public class GameController {
 
         Connection clickedConnection = findClickedConnection(localClick.getX(), localClick.getY());
         if (clickedConnection != null) {
+            System.out.println("Client: Clicked on a connection. Sending request to add bend point.");
 
-            if (gameState.getCoins() >= 1) {
-                if (gameState.decreaseCoins(1)) {
-                    clickedConnection.addBendPoint(localClick);
-                    gameView.redrawAll(gameState);
-                }
-            } else {
-                System.out.println("Not enough coins to add a bend point.");
-            }
+            JSONObject payload = new JSONObject();
+            payload.put("connectionId", clickedConnection.getId().toString());
+            payload.put("x", localClick.getX());
+            payload.put("y", localClick.getY());
+            NetworkManager.getInstance().sendAction("ADD_BEND_POINT", payload);
+
             return;
         }
     }
@@ -439,7 +436,7 @@ public class GameController {
         }
         else if (isDraggingBendPoint && activeConnection != null) {
             activeConnection.moveBendPoint(activeBendPointIndex, localDrag);
-            gameView.redrawAll(gameState);
+            gameView.redrawAll(gameState, null);
         }
         else if (isMovingSystem && systemToMove != null) {
 
@@ -449,7 +446,7 @@ public class GameController {
 
             systemToMove.setPosition(newX, newY);
 
-            gameView.redrawAll(gameState);
+            gameView.redrawAll(gameState, null);
         }
     }
 
@@ -462,16 +459,14 @@ public class GameController {
             Port targetPort = findClickedPort(localReleaseCoords.getX(), localReleaseCoords.getY(), PortType.INPUT);
 
             if (targetPort != null && !targetPort.isConnected() && isValidConnectionAttempt(wiringStartPort, targetPort)) {
-                double requiredLength = new Point2D(wiringStartPort.getAbsoluteX(), wiringStartPort.getAbsoluteY())
-                        .distance(targetPort.getAbsoluteX(), targetPort.getAbsoluteY());
+                JSONObject payload = new JSONObject();
+                payload.put("startPortId", wiringStartPort.getId().toString());
+                payload.put("endPortId", targetPort.getId().toString());
 
-                if (gameState.getRemainingWireLength() >= requiredLength) {
-                    if (gameState.useWire(requiredLength)) {
-                        Connection newConnection = new Connection(wiringStartPort, targetPort);
-                        gameState.addConnection(newConnection);
-                        AudioManager.playSoundEffect(AudioManager.SFX_CONNECT_SUCCESS);
-                    }
-                }
+                NetworkManager.getInstance().sendAction("CREATE_WIRE", payload);
+                System.out.println("Client: Sent CREATE_WIRE request to server for ports " +
+                        wiringStartPort.getId().toString().substring(0, 4) + " -> " +
+                        targetPort.getId().toString().substring(0, 4));
             }
         }
 
@@ -501,7 +496,7 @@ public class GameController {
 
 
         if (gameView != null && gameState != null) {
-            gameView.redrawAll(gameState);
+            gameView.redrawAll(gameState, null);
 
             for (SystemNode system : gameState.getSystems()) {
                 system.updateAllPortsActuallyConnectedState();
@@ -676,7 +671,7 @@ public class GameController {
                 if(connToRemove.getEndPort() != null) connToRemove.getEndPort().setConnectedConnection(null);
                 gameState.removeConnection(connToRemove);
             }
-            gameView.redrawAll(gameState);
+            gameView.redrawAll(gameState, null);
         }
     }
 
@@ -719,7 +714,7 @@ public class GameController {
         }
 
         if (needsRedraw) {
-            gameView.redrawAll(gameState);
+            gameView.redrawAll(gameState, null);
         }
     }
 
