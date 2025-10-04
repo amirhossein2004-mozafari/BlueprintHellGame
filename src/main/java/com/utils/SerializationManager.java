@@ -1,9 +1,6 @@
 package com.utils;
 
-import com.api.dto.PacketDTO;
-import com.api.dto.PortDTO;
-import com.api.dto.SystemDTO;
-import com.api.dto.WireDTO;
+import com.api.dto.*;
 import com.api.enums.PacketType;
 import com.api.enums.PortType;
 import com.api.enums.SystemType;
@@ -146,7 +143,7 @@ public class SerializationManager {
 
         Packet packet = new Packet(modelType, dto.getX(), dto.getY());
         packet.setId(dto.getId());
-
+        packet.setPlayerId(dto.getPlayerId());
         return packet;
     }
 
@@ -161,6 +158,7 @@ public class SerializationManager {
         dto.setId(packet.getId());
         dto.setPacketType(mapGamePacketTypeToApiPacketType(packet.getType()));
         dto.setPosition(new Point2D(packet.getX(), packet.getY()));
+        dto.setPlayerId(packet.getPlayerId());
         return dto;
     }
 
@@ -210,6 +208,32 @@ public class SerializationManager {
         return dtoList;
     }
 
+    public static String toJsonLeaderboard(List<LeaderboardEntryDTO> dtoList) {
+        JSONArray jsonArray = new JSONArray();
+        for (LeaderboardEntryDTO dto : dtoList) {
+            JSONObject obj = new JSONObject();
+            obj.put("username", dto.getUsername());
+            obj.put("score", dto.getScore());
+            obj.put("packetLoss", dto.getPacketLoss());
+            obj.put("playedAt", dto.getPlayedAt());
+            jsonArray.put(obj);
+        }
+        return jsonArray.toString();
+    }
 
+    public static List<LeaderboardEntryDTO> fromJsonToLeaderboardDTOs(String json) {
+        List<LeaderboardEntryDTO> list = new ArrayList<>();
+        JSONArray jsonArray = new JSONArray(json);
+        for (int i = 0; i < jsonArray.length(); i++) {
+            JSONObject obj = jsonArray.getJSONObject(i);
+            list.add(new LeaderboardEntryDTO(
+                    obj.getString("username"),
+                    obj.getInt("score"),
+                    obj.getDouble("packetLoss"),
+                    obj.getString("playedAt")
+            ));
+        }
+        return list;
+    }
 
 }

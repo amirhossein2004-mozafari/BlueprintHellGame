@@ -1,6 +1,7 @@
 package com.controller;
 
 import com.blueprinthell.MainApplication;
+import com.utils.NetworkManager;
 
 public class MenuController {
     private final MainApplication mainApp;
@@ -35,4 +36,10 @@ public class MenuController {
             mainApp.getPrimaryStage().close();
         }
     }
+
+    public void handleLeaderboardButton() {
+        System.out.println("Menu: Leaderboard button pressed. Sending request.");
+        NetworkManager.getInstance().sendAction("GET_LEADERBOARD", new org.json.JSONObject());
+    }
+
 }

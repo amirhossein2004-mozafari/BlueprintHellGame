@@ -3,6 +3,7 @@ package com.blueprinthell;
 import com.api.dto.PacketDTO;
 import com.api.dto.SystemDTO;
 import com.api.dto.WireDTO;
+import com.blueprinthell.db.entities.GameResultEntity;
 import com.controller.GameController;
 import com.model.*;
 import com.utils.LevelLoader;
@@ -14,10 +15,15 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import com.blueprinthell.db.DatabaseManager;
+import com.api.dto.LeaderboardEntryDTO;
 
 public class GameSession implements Runnable {
     private final Socket p1Socket;
@@ -29,6 +35,7 @@ public class GameSession implements Runnable {
     private GameState p2GameState;
     private GameController p1GameController;
     private GameController p2GameController;
+    private static final String HASH_SECRET_KEY = "Blueprint_Hell_Is_Not_A_Real_Place_Or_Is_It?";
 
     public GameSession(Socket p1Socket, Socket p2Socket) {
         this.p1Socket = p1Socket;
@@ -42,7 +49,8 @@ public class GameSession implements Runnable {
             BufferedReader p1In = new BufferedReader(new InputStreamReader(p1Socket.getInputStream()));
             p2Out = new PrintWriter(p2Socket.getOutputStream(), true);
             BufferedReader p2In = new BufferedReader(new InputStreamReader(p2Socket.getInputStream()));
-
+            p1Out.println("PLAYER_ID:1");
+            p2Out.println("PLAYER_ID:2");
             p1GameState = LevelLoader.loadLevel(1);
             p2GameState = LevelLoader.loadLevel(1);
             p1GameController = new GameController(p1GameState, null, null);
@@ -52,8 +60,8 @@ public class GameSession implements Runnable {
 
             System.out.println("Game Session Started for " + p1Socket.getInetAddress() + " and " + p2Socket.getInetAddress());
 
-            new Thread(() -> playerListener(p1In, "Player 1")).start();
-            new Thread(() -> playerListener(p2In, "Player 2")).start();
+            new Thread(() -> playerListener(p1In, p1Out, "Player 1")).start();
+            new Thread(() -> playerListener(p2In, p2Out, "Player 2")).start();
 
             long lastTime = System.nanoTime();
             double nsPerUpdate = 1000000000.0 / 60.0;
@@ -65,8 +73,8 @@ public class GameSession implements Runnable {
                 lastTime = now;
 
                 while(delta >= 1){
-                    p1GameController.updateGame(1.0 / 60.0);
-                    p2GameController.updateGame(1.0 / 60.0);
+                    p1GameController.updateGame(1.0 / 60.0, 1);
+                    p2GameController.updateGame(1.0 / 60.0, 2);
                     delta--;
                 }
 
@@ -106,7 +114,7 @@ public class GameSession implements Runnable {
     }
 
 
-    private void playerListener(BufferedReader in, String playerName) {
+    private void playerListener(BufferedReader in, PrintWriter out, String playerName) {
         String clientMessage;
         GameState myGameState = playerName.equals("Player 1") ? p1GameState : p2GameState;
         GameState opponentGameState = playerName.equals("Player 1") ? p2GameState : p1GameState;
@@ -132,6 +140,15 @@ public class GameSession implements Runnable {
                 else if ("ADD_BEND_POINT".equals(action)) {
                     handleAddBendPoint(myGameState, payload);
                 }
+
+                else if ("GET_LEADERBOARD".equals(action)) {
+                    handleGetLeaderboard(out);
+                }
+
+                else if ("SUBMIT_OFFLINE_RESULT".equals(action)) {
+                    handleSubmitOfflineResult(payload);
+                }
+
             }
         } catch (Exception e) {
             System.out.println("Connection lost for " + playerName);
@@ -181,6 +198,7 @@ public class GameSession implements Runnable {
                 .filter(s -> s.getId().equals(systemId))
                 .findFirst().orElse(null);
 
+        int myPlayerId = (myGameState == p1GameState) ? 1 : 2;
         if (mySystem != null && mySystem.isControllable() && !mySystem.isOnCooldown()) {
             mySystem.startCooldown();
 
@@ -190,7 +208,7 @@ public class GameSession implements Runnable {
 
                 Packet newPacket = new Packet(PacketType.SQUARE,
                         opponentSourceSystem.getX(), opponentSourceSystem.getY());
-
+                newPacket.setPlayerId(myPlayerId);
                 opponentGameState.addPacket(newPacket);
 
                 System.out.println("Server: Packet injected into opponent's network successfully.");
@@ -221,6 +239,65 @@ public class GameSession implements Runnable {
         } else {
             System.out.println("Server: Player tried to add bend point but has insufficient coins.");
         }
+    }
+
+    private void handleGetLeaderboard(PrintWriter out) {
+        List<GameResultEntity> topScores = DatabaseManager.getLeaderboardTopScores(10);
+        List<LeaderboardEntryDTO> dtoList = new ArrayList<>();
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+
+        for (GameResultEntity entity : topScores) {
+            dtoList.add(new LeaderboardEntryDTO(
+                    entity.getPlayer().getUsername(),
+                    entity.getFinalCoins(),
+                    entity.getPacketLossPercentage(),
+                    sdf.format(entity.getPlayDate())
+            ));
+        }
+
+        String jsonPayload = SerializationManager.toJsonLeaderboard(dtoList);
+        out.println("UPDATE_LEADERBOARD:" + jsonPayload);
+        System.out.println("Server: Sent leaderboard data to a client.");
+    }
+
+
+    private void handleSubmitOfflineResult(JSONObject payload) {
+        try {
+            String username = payload.getString("username");
+            int coins = payload.getInt("coins");
+            int level = payload.getInt("levelNumber");
+            double time = payload.getDouble("gameTimeElapsed");
+            String clientHash = payload.getString("integrityHash");
+
+            String dataToHash = coins + ":" + level + ":" + (int)time;
+            String serverHash = generateHash(dataToHash);
+
+            if (serverHash.equals(clientHash)) {
+                System.out.println("Server: Offline result for " + username + " is VALID. Saving to DB.");
+                DatabaseManager.saveGameResult(username, coins, 0.0);
+            } else {
+                System.err.println("Server: OFFLINE RESULT REJECTED. HASH MISMATCH.");
+                System.err.println(" > Client sent: " + clientHash);
+                System.err.println(" > Server calculated: " + serverHash);
+            }
+        } catch (Exception e) {
+            System.err.println("Server: Error processing offline result.");
+            e.printStackTrace();
+        }
+    }
+
+    private String generateHash(String data) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hashBytes = digest.digest((data + HASH_SECRET_KEY).getBytes(StandardCharsets.UTF_8));
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hashBytes) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (Exception e) { e.printStackTrace(); return ""; }
     }
 
 }

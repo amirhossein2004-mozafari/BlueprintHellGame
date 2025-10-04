@@ -44,6 +44,8 @@ public class Packet {
     private transient SystemNode lastVisitedSystem;
     private PacketType originalType = null;
     private PacketType emulatedMovementType = null;
+    private int playerId;
+
 
     public Packet(PacketType type, double initialX, double initialY) {
         this.id = UUID.randomUUID();
@@ -496,6 +498,13 @@ public class Packet {
         double labelOffsetY = -15;
         this.sizeLabel.setLayoutX(this.x + labelOffsetX);
         this.sizeLabel.setLayoutY(this.y + labelOffsetY);
+    }
+
+    public int getPlayerId() {
+        return playerId;
+    }
+    public void setPlayerId(int playerId) {
+        this.playerId = playerId;
     }
 
     public SystemNode getLastVisitedSystem() {

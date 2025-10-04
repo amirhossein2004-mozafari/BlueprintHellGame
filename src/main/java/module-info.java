@@ -8,12 +8,13 @@ module com.blueprinthell {
     requires org.hibernate.orm.core;
     requires jakarta.persistence;
 
+    requires org.reflections;
+
     requires java.naming;
     requires java.sql;
     requires java.persistence;
 
     opens com.blueprinthell.db.entities to org.hibernate.orm.core;
-
     opens com.blueprinthell to javafx.fxml;
     opens com.model to com.google.gson;
 

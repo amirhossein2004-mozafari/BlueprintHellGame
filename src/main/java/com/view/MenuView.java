@@ -37,6 +37,10 @@ public class MenuView extends VBox {
         Button settingsButton = createMenuButton("تنظیمات");
         settingsButton.setOnAction(e -> controller.handleSettingsButton());
 
+        Button leaderboardButton = createMenuButton("لیدربرد");
+        leaderboardButton.setOnAction(e -> controller.handleLeaderboardButton());
+        this.getChildren().add(leaderboardButton);
+
         Button exitButton = createMenuButton("خروج");
         exitButton.setOnAction(e -> controller.handleExitButton());
 

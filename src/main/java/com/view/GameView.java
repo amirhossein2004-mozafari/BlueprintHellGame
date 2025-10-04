@@ -21,6 +21,7 @@ public class GameView extends Pane {
 
     private final Map<Packet, Node> packetNodes = new HashMap<>();
     private final Map<Port, Shape> portShapes = new HashMap<>();
+    private int myPlayerId = 0;
 
     public GameView(double windowWidth, double gameAreaHeight) {
         this.setStyle("-fx-background-color: #" + Config.COLOR_BACKGROUND.toString().substring(2) + ";");
@@ -30,7 +31,8 @@ public class GameView extends Pane {
         System.out.println("GameView constructed. PrefWidth: " + getPrefWidth() + " MinWidth: " + getMinWidth());
     }
 
-    public void redrawAll(GameState myGameState, GameState opponentGameState) {
+    public void redrawAll(GameState myGameState, GameState opponentGameState, int myPlayerId) {
+        this.myPlayerId = myPlayerId;
         this.getChildren().clear();
         packetNodes.clear();
         portShapes.clear();
@@ -40,10 +42,12 @@ public class GameView extends Pane {
             }
         }
 
-        drawConnections(myGameState.getConnections());
-        drawSystems(myGameState.getSystems());
-        drawPackets(myGameState.getPackets());
-        drawEffectPoints(myGameState.getEffectPoints());
+        if (myGameState != null) {
+            drawConnections(myGameState.getConnections());
+            drawSystems(myGameState.getSystems());
+            drawPackets(myGameState.getPackets());
+            drawEffectPoints(myGameState.getEffectPoints());
+        }
 
     }
 

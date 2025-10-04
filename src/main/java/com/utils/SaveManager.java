@@ -10,11 +10,14 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.nio.charset.StandardCharsets;
 
 public class SaveManager {
 
-    private static final String SAVE_FILE_PATH = "gameState.json";
-
+    private static final String SAVE_FILE_PATH = "offline_game.json";
+    private static final String HASH_SECRET_KEY = "Blueprint_Hell_Is_Not_A_Real_Place_Or_Is_It?";
 
     public static void saveGame(GameState gameState) {
         if (gameState == null || !gameState.isGameRunning()) {
@@ -22,6 +25,11 @@ public class SaveManager {
             return;
         }
         JSONObject saveJson = gameStateToJson(gameState);
+
+        String dataToHash = gameState.getCoins() + ":" + gameState.getCurrentLevelNumber() + ":" + (int)gameState.getGameTimeElapsedSeconds();
+        String calculatedHash = generateHash(dataToHash);
+        saveJson.put("integrityHash", calculatedHash);
+
         try (FileWriter file = new FileWriter(SAVE_FILE_PATH)) {
             file.write(saveJson.toString(2));
             System.out.println("Game state saved successfully to " + SAVE_FILE_PATH);
@@ -29,6 +37,39 @@ public class SaveManager {
             System.err.println("Error saving game state to file: " + e.getMessage());
             e.printStackTrace();
         }
+    }
+
+    private static String generateHash(String data) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hashBytes = digest.digest((data + HASH_SECRET_KEY).getBytes(StandardCharsets.UTF_8));
+
+
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hashBytes) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+            return "";
+        }
+    }
+
+    public static JSONObject gameStateToJsonForServer(GameState gameState) {
+        JSONObject json = new JSONObject();
+        json.put("levelNumber", gameState.getCurrentLevelNumber());
+        json.put("coins", gameState.getCoins());
+        json.put("gameTimeElapsed", gameState.getGameTimeElapsedSeconds());
+
+        String dataToHash = gameState.getCoins() + ":" + gameState.getCurrentLevelNumber() + ":" + (int)gameState.getGameTimeElapsedSeconds();
+        json.put("integrityHash", generateHash(dataToHash));
+
+        json.put("username", "offline_player_" + System.currentTimeMillis() % 1000);
+
+        return json;
     }
 
 

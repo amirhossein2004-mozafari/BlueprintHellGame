@@ -19,6 +19,8 @@ import java.util.Random;
 import java.util.stream.Collectors;
 import com.utils.NetworkManager;
 import org.json.JSONObject;
+import org.reflections.Reflections;
+import java.util.Set;
 
 public class GameController {
 
@@ -44,6 +46,8 @@ public class GameController {
     private SystemNode systemToMove = null;
     private boolean testPacketsSpawned = false;
     private boolean collisionTestPacketsSpawned = false;
+    private int myPlayerId = 0;
+    private static List<PacketType> spawnablePacketTypes = null;
 
     public GameController(GameState gameState, GameView gameView, MainApplication mainApp) {
         if (gameState == null || gameView == null || mainApp == null) {
@@ -66,14 +70,13 @@ public class GameController {
         }
 
         if (gameView != null && gameState != null) {
-            gameView.redrawAll(gameState, null);
-        }
+            gameView.redrawAll(gameState, null, myPlayerId);        }
         checkAndSetAllPortsConnected();
         System.out.println("GameController.initializeGame: Game Initialized. Overall HUD ports connected: " + gameState.areAllPortsConnected());
     }
 
-    public void updateGame(double scaledDeltaTime) {
-        if (gameState == null || mainApp == null) {
+    public void updateGame(double scaledDeltaTime, int playerId) {
+        if (gameState == null ) {
             return;
         }
 
@@ -87,7 +90,7 @@ public class GameController {
         updateEffectPoints(scaledDeltaTime);
 
         if (gameState.canSpawnMorePackets() && !gameState.isLevelTimeUp()) {
-            spawnNewPackets(scaledDeltaTime);
+            spawnNewPackets(scaledDeltaTime, playerId);
         }
 
         if (!gameState.isSkillActive(AbilityType.AIRYAMAN)) {
@@ -102,11 +105,35 @@ public class GameController {
         if (gameView != null) {
             gameView.updatePacketPositions(gameState);
         }
-        checkEndConditions();
+        if(this.mainApp != null){
+            checkEndConditions();
+        }
     }
 
-    private void spawnNewPackets(double scaledDeltaTime) {
-        if (gameState == null) return;
+    public void updateGame(double scaledDeltaTime) {
+        updateGame(scaledDeltaTime, 0);
+    }
+
+
+    private void spawnNewPackets(double scaledDeltaTime, int playerId) {
+        if (spawnablePacketTypes == null) {
+            System.out.println("GC (Reflection): Scanning for spawnable packet types for the first time...");
+            spawnablePacketTypes = new ArrayList<>();
+
+            for (PacketType type : PacketType.values()) {
+                if (type != PacketType.BIT_PACKET &&
+                        type != PacketType.TROJAN &&
+                        type != PacketType.PROTECTED &&
+                        type != PacketType.LARGE) {
+                    spawnablePacketTypes.add(type);
+                }
+            }
+            System.out.println("GC (Reflection): Found " + spawnablePacketTypes.size() + " spawnable types: " + spawnablePacketTypes);
+        }
+
+        if (gameState == null || spawnablePacketTypes.isEmpty()) {
+            return;
+        }
 
         timeSinceLastPacket += scaledDeltaTime;
         if (timeSinceLastPacket < Config.PACKET_SPAWN_INTERVAL) {
@@ -120,54 +147,35 @@ public class GameController {
 
         List<SystemNode> sourceSystems = gameState.getSystemsByRole(SystemRole.SOURCE);
         if (sourceSystems.isEmpty()) {
+            System.err.println("GC.Spawn Warning: No SOURCE systems found in the level to spawn packets from.");
             return;
         }
+
         SystemNode source = sourceSystems.get(random.nextInt(sourceSystems.size()));
 
         List<Port> availablePorts = new ArrayList<>();
         for (Port port : source.getOutputPorts()) {
-            Connection conn = port.getConnectedConnection();
-            if (conn != null && !isConnectionOccupied(conn, gameState)) {
+            if (port.isConnected()) {
                 availablePorts.add(port);
             }
         }
 
-        if (!availablePorts.isEmpty()) {
-            Port chosenPort = availablePorts.get(random.nextInt(availablePorts.size()));
-
-
-            PacketType[] spawnableTypes;
-
-            if (gameState.getCurrentLevelNumber() >= 5) {
-                spawnableTypes = new PacketType[] {
-                        PacketType.SQUARE,
-                        PacketType.TRIANGLE,
-                        PacketType.MESSENGER_INFINITY,
-                        PacketType.CONFIDENTIAL_NORMAL,
-                        PacketType.LARGE_8,
-                        PacketType.LARGE_10
-                };
-            } else {
-                spawnableTypes = new PacketType[] {
-                        PacketType.SQUARE,
-                        PacketType.TRIANGLE,
-                        PacketType.MESSENGER_INFINITY,
-                        PacketType.CONFIDENTIAL_NORMAL
-                };
-            }
-
-            PacketType typeToSpawn = spawnableTypes[random.nextInt(spawnableTypes.length)];
-
-
-            Packet newPacket = new Packet(typeToSpawn, chosenPort.getAbsoluteX(), chosenPort.getAbsoluteY());
-
-            gameState.addPacket(newPacket);
-            gameState.registerSpawnedPacket(newPacket);
-
-            newPacket.startMoving(chosenPort.getConnectedConnection());
-
-            System.out.println("GC.Spawn: Spawned " + typeToSpawn + " for level " + gameState.getCurrentLevelNumber() + ". Total spawned: " + gameState.getTotalPacketsSuccessfullySpawnedCount());
+        if (availablePorts.isEmpty()) {
+            return;
         }
+
+        Port chosenPort = availablePorts.get(random.nextInt(availablePorts.size()));
+
+        PacketType typeToSpawn = spawnablePacketTypes.get(random.nextInt(spawnablePacketTypes.size()));
+
+        Packet newPacket = new Packet(typeToSpawn, chosenPort.getAbsoluteX(), chosenPort.getAbsoluteY());
+        newPacket.setPlayerId(playerId);
+
+        gameState.addPacket(newPacket);
+        gameState.registerSpawnedPacket(newPacket);
+        newPacket.startMoving(chosenPort.getConnectedConnection());
+
+        System.out.println("GC.Spawn (Reflected): Player " + playerId + " spawned " + typeToSpawn + " from system " + source.getId().toString().substring(0,4));
     }
 
     private SystemNode findRandomSourceSystem(GameState state) {
@@ -344,7 +352,7 @@ public class GameController {
                     if(gameState.decreaseCoins(effectCost)){
                         EffectPoint newEffect = new EffectPoint(effectToPlace, clickedConnection, localClick, effectDuration);
                         gameState.addEffectPoint(newEffect);
-                        gameView.redrawAll(gameState, null);
+                        gameView.redrawAll(gameState, null, myPlayerId);
                     }
                 }
             } else if (effectToPlace == EffectType.SISYPHUS_MOVE_SYSTEM) {
@@ -436,7 +444,7 @@ public class GameController {
         }
         else if (isDraggingBendPoint && activeConnection != null) {
             activeConnection.moveBendPoint(activeBendPointIndex, localDrag);
-            gameView.redrawAll(gameState, null);
+            gameView.redrawAll(gameState, null, myPlayerId);
         }
         else if (isMovingSystem && systemToMove != null) {
 
@@ -446,7 +454,7 @@ public class GameController {
 
             systemToMove.setPosition(newX, newY);
 
-            gameView.redrawAll(gameState, null);
+            gameView.redrawAll(gameState, null, myPlayerId);
         }
     }
 
@@ -496,7 +504,7 @@ public class GameController {
 
 
         if (gameView != null && gameState != null) {
-            gameView.redrawAll(gameState, null);
+            gameView.redrawAll(gameState, null, myPlayerId);
 
             for (SystemNode system : gameState.getSystems()) {
                 system.updateAllPortsActuallyConnectedState();
@@ -671,7 +679,7 @@ public class GameController {
                 if(connToRemove.getEndPort() != null) connToRemove.getEndPort().setConnectedConnection(null);
                 gameState.removeConnection(connToRemove);
             }
-            gameView.redrawAll(gameState, null);
+            gameView.redrawAll(gameState, null, myPlayerId);
         }
     }
 
@@ -714,8 +722,12 @@ public class GameController {
         }
 
         if (needsRedraw) {
-            gameView.redrawAll(gameState, null);
+            gameView.redrawAll(gameState, null, myPlayerId);
         }
+    }
+
+    public void setMyPlayerId(int playerId) {
+        this.myPlayerId = playerId;
     }
 
     public void pauseGameLogic() {

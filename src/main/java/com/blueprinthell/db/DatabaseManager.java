@@ -7,6 +7,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.Persistence;
 import java.util.Date;
+import java.util.List;
 
 
 public class DatabaseManager {
@@ -53,4 +54,19 @@ public class DatabaseManager {
             emf.close();
         }
     }
+
+    public static List<GameResultEntity> getLeaderboardTopScores(int limit) {
+        EntityManager em = emf.createEntityManager();
+        try {
+            List<GameResultEntity> results = em.createQuery(
+                            "SELECT r FROM GameResultEntity r ORDER BY r.finalCoins DESC", GameResultEntity.class)
+                    .setMaxResults(limit)
+                    .getResultList();
+            System.out.println("DatabaseManager: Fetched top " + results.size() + " scores.");
+            return results;
+        } finally {
+            em.close();
+        }
+    }
+
 }

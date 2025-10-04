@@ -1,5 +1,6 @@
 package com.blueprinthell;
 
+import com.api.dto.LeaderboardEntryDTO;
 import com.api.dto.PacketDTO;
 import com.api.dto.SystemDTO;
 import com.api.dto.WireDTO;
@@ -35,6 +36,7 @@ import javafx.scene.layout.BorderPane;
 import com.view.LevelSelectionView;
 import com.view.SettingsView;
 import com.controller.SettingsController;
+import org.json.JSONObject;
 
 public class MainApplication extends Application {
 
@@ -52,6 +54,7 @@ public class MainApplication extends Application {
     private GameState completedGameStateForGameOver;
     private AnimationTimer autoSaveTimer;
     private GameState opponentGameState;
+    private int myPlayerId = 0;
 
 
     @Override
@@ -65,6 +68,14 @@ public class MainApplication extends Application {
         boolean isOnline = NetworkManager.getInstance().connect();
 
         if (isOnline) {
+            GameState offlineResult = SaveManager.loadGame();
+            if (offlineResult != null) {
+                System.out.println("Client: Found offline game result. Sending to server for validation...");
+                JSONObject payload = SaveManager.gameStateToJsonForServer(offlineResult);
+                NetworkManager.getInstance().sendAction("SUBMIT_OFFLINE_RESULT", payload);
+                SaveManager.deleteSaveFile();
+            }
+
             new Thread(() -> {
                 String serverMessage;
                 try {
@@ -100,6 +111,21 @@ public class MainApplication extends Application {
                                 List<SystemDTO> opponentSystemDTOs = SerializationManager.fromJsonToSystemDTOs(jsonData);
                                 Platform.runLater(() -> updateOpponentSystemsOnScreen(opponentSystemDTOs));
                                 break;
+
+                            case "UPDATE_LEADERBOARD":
+                                List<LeaderboardEntryDTO> leaderboardData = SerializationManager.fromJsonToLeaderboardDTOs(jsonData);
+                                Platform.runLater(() -> showLeaderboard(leaderboardData));
+                                break;
+
+                            case "PLAYER_ID":
+                                this.myPlayerId = Integer.parseInt(jsonData);
+                                System.out.println("Client: I am Player " + this.myPlayerId);
+
+                                if (gameController != null) {
+                                    gameController.setMyPlayerId(this.myPlayerId);
+                                }
+                                break;
+
                         }
                     }
                 } catch (Exception e) {
@@ -538,7 +564,7 @@ public class MainApplication extends Application {
 
 
         if (!this.gameState.getConnections().isEmpty()) {
-            gameView.redrawAll(gameState, opponentGameState);
+            gameView.redrawAll(gameState, opponentGameState, myPlayerId);
         } else {
             gameController.initializeGame();
         }
@@ -609,7 +635,7 @@ public class MainApplication extends Application {
                 gameState.addSystem(node);
             }
             if (gameView != null) {
-                gameView.redrawAll(gameState, opponentGameState);
+                gameView.redrawAll(gameState, opponentGameState, myPlayerId);
             }
         }
     }
@@ -652,7 +678,7 @@ public class MainApplication extends Application {
             }
         }
 
-        gameView.redrawAll(gameState, opponentGameState);
+        gameView.redrawAll(gameState, opponentGameState, myPlayerId);
     }
 
 
@@ -667,8 +693,14 @@ public class MainApplication extends Application {
             opponentGameState.addSystem(node);
         }
         if (gameView != null) {
-            gameView.redrawAll(gameState, opponentGameState);
+            gameView.redrawAll(gameState, opponentGameState, myPlayerId);
         }
+    }
+
+    public void showLeaderboard(List<LeaderboardEntryDTO> data) {
+        LeaderboardView leaderboardView = new LeaderboardView(this, data);
+        Scene scene = new Scene(leaderboardView, Config.WINDOW_WIDTH, Config.WINDOW_HEIGHT);
+        primaryStage.setScene(scene);
     }
 
     public Stage getPrimaryStage() { return primaryStage; }

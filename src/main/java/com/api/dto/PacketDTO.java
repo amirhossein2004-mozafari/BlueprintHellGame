@@ -8,9 +8,17 @@ public class PacketDTO {
     private UUID id;
     private PacketType packetType;
     private Point2D position;
+    private int playerId;
 
     public PacketDTO() {
 
+    }
+
+    public int getPlayerId() {
+        return playerId;
+    }
+    public void setPlayerId(int playerId) {
+        this.playerId = playerId;
     }
 
     public UUID getId() { return id; }
