@@ -46,7 +46,7 @@ public class ClientHandler implements Runnable {
                 out.println("ERROR: Could not load level on server.");
                 return;
             }
-            this.gameController = new GameController(gameState, null, null);
+            this.gameController = new GameController(gameState, null, null, true);
             gameState.setGameRunning(true);
 
             this.gameId = UUID.randomUUID();

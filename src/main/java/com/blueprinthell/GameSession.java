@@ -36,69 +36,115 @@ public class GameSession implements Runnable {
     private GameController p1GameController;
     private GameController p2GameController;
     private static final String HASH_SECRET_KEY = "Blueprint_Hell_Is_Not_A_Real_Place_Or_Is_It?";
+    private enum SessionState { SETUP, RUNNING, FINISHED }
+    private SessionState currentState = SessionState.SETUP;
 
-    public GameSession(Socket p1Socket, Socket p2Socket) {
-        this.p1Socket = p1Socket;
-        this.p2Socket = p2Socket;
-    }
-
+    private double setupTimeRemaining = 60.0;
+    private boolean p1Ready = false;
+    private boolean p2Ready = false;
     @Override
     public void run() {
+        GameState p1GameState = null;
+        GameState p2GameState = null;
+
         try {
             p1Out = new PrintWriter(p1Socket.getOutputStream(), true);
             BufferedReader p1In = new BufferedReader(new InputStreamReader(p1Socket.getInputStream()));
             p2Out = new PrintWriter(p2Socket.getOutputStream(), true);
             BufferedReader p2In = new BufferedReader(new InputStreamReader(p2Socket.getInputStream()));
+
             p1Out.println("PLAYER_ID:1");
             p2Out.println("PLAYER_ID:2");
+
             p1GameState = LevelLoader.loadLevel(1);
             p2GameState = LevelLoader.loadLevel(1);
-            p1GameController = new GameController(p1GameState, null, null);
-            p2GameController = new GameController(p2GameState, null, null);
-            p1GameState.setGameRunning(true);
-            p2GameState.setGameRunning(true);
+
+            if (p1GameState == null || p2GameState == null) {
+                System.err.println("Game Session: Failed to load level files. Terminating session.");
+                return;
+            }
+
+            p1GameController = new GameController(p1GameState, null, null, true);
+            p2GameController = new GameController(p2GameState, null, null, true);
 
             System.out.println("Game Session Started for " + p1Socket.getInetAddress() + " and " + p2Socket.getInetAddress());
 
             new Thread(() -> playerListener(p1In, p1Out, "Player 1")).start();
             new Thread(() -> playerListener(p2In, p2Out, "Player 2")).start();
 
-            long lastTime = System.nanoTime();
-            double nsPerUpdate = 1000000000.0 / 60.0;
-            double delta = 0;
 
-            while (!p1Socket.isClosed() && !p2Socket.isClosed()) {
+
+            long lastTime = System.nanoTime();
+            boolean sessionIsActive = true;
+
+            while (sessionIsActive && !p1Socket.isClosed() && !p2Socket.isClosed()) {
                 long now = System.nanoTime();
-                delta += (now - lastTime) / nsPerUpdate;
+
+                double deltaTime = (now - lastTime) / 1_000_000_000.0;
                 lastTime = now;
 
-                while(delta >= 1){
-                    p1GameController.updateGame(1.0 / 60.0, 1);
-                    p2GameController.updateGame(1.0 / 60.0, 2);
-                    delta--;
-                }
 
-                broadcastStateToPlayer(p1Out, p1GameState, p2GameState);
-                broadcastStateToPlayer(p2Out, p2GameState, p1GameState);
+                if (currentState == SessionState.SETUP) {
+
+                    setupTimeRemaining -= deltaTime;
+                    broadcastSetupState();
+
+                    if ((p1Ready && p2Ready) || setupTimeRemaining <= 0) {
+                        System.out.println("Server: Setup phase finished. Switching to RUNNING state.");
+                        currentState = SessionState.RUNNING;
+                        p1GameState.setGameRunning(true);
+                        p2GameState.setGameRunning(true);
+                    }
+                }
+                else if (currentState == SessionState.RUNNING) {
+                    p1GameController.updateGame(deltaTime, 1);
+                    p2GameController.updateGame(deltaTime, 2);
+
+                    if (isGameOver(p1GameState) || isGameOver(p2GameState)) {
+                        currentState = SessionState.FINISHED;
+                        sessionIsActive = false;
+                    } else {
+                        broadcastStateToPlayer(p1Out, p1GameState, p2GameState);
+                        broadcastStateToPlayer(p2Out, p2GameState, p1GameState);
+                    }
+                }
 
                 Thread.sleep(16);
             }
 
+            System.out.println("Server: Game session has ended. Sending final results.");
+            sendGameOverMessage(p1Out, p1GameState, p2GameState);
+            sendGameOverMessage(p2Out, p2GameState, p1GameState);
+
         } catch (Exception e) {
-            System.err.println("Game Session crashed: " + e.getMessage());
+            System.err.println("Game Session crashed due to an exception: " + e.getMessage());
+            e.printStackTrace();
+
         } finally {
-            System.out.println("Game Session finished. Saving results...");
+            System.out.println("Game Session: Entering finally block for cleanup.");
 
-            String p1Username = p1Socket.getInetAddress().toString();
-            String p2Username = p2Socket.getInetAddress().toString();
+            if (p1GameState != null && p2GameState != null) {
+                System.out.println("Saving results to database...");
+                String p1Username = p1Socket.getInetAddress().toString();
+                String p2Username = p2Socket.getInetAddress().toString();
 
-            DatabaseManager.saveGameResult(p1Username, p1GameState.getCoins(), p1GameState.getPacketLossPercentageBySize());
-            DatabaseManager.saveGameResult(p2Username, p2GameState.getCoins(), p2GameState.getPacketLossPercentageBySize());
+                DatabaseManager.saveGameResult(p1Username, p1GameState.getCoins(), p1GameState.getPacketLossPercentageBySize());
+                DatabaseManager.saveGameResult(p2Username, p2GameState.getCoins(), p2GameState.getPacketLossPercentageBySize());
+            } else {
+                System.err.println("Game Session: Game states were not initialized, skipping database save.");
+            }
 
-            try { p1Socket.close(); } catch (Exception e) {}
-            try { p2Socket.close(); } catch (Exception e) {}
+            try { if (p1Socket != null) p1Socket.close(); } catch (Exception e) {}
+            try { if (p2Socket != null) p2Socket.close(); } catch (Exception e) {}
         }
     }
+    public GameSession(Socket p1Socket, Socket p2Socket) {
+        this.p1Socket = p1Socket;
+        this.p2Socket = p2Socket;
+    }
+
+
+
 
     private void broadcastStateToPlayer(PrintWriter out, GameState myState, GameState opponentState) {
         List<SystemDTO> mySystemDTOs = myState.getSystems().stream().map(SerializationManager::toDTO).collect(Collectors.toList());
@@ -147,6 +193,10 @@ public class GameSession implements Runnable {
 
                 else if ("SUBMIT_OFFLINE_RESULT".equals(action)) {
                     handleSubmitOfflineResult(payload);
+                }
+
+                else if ("PLAYER_READY".equals(action)) {
+                    handlePlayerReady(playerName);
                 }
 
             }
@@ -298,6 +348,52 @@ public class GameSession implements Runnable {
             }
             return hexString.toString();
         } catch (Exception e) { e.printStackTrace(); return ""; }
+    }
+
+
+    private boolean isGameOver(GameState gameState) {
+        boolean timeUp = gameState.isLevelTimeUp();
+        boolean noPacketsLeft = gameState.getPackets().isEmpty();
+        boolean allSystemsProcessed = gameState.getSystems().stream()
+                .noneMatch(s -> s.getRole() == SystemRole.INTERMEDIATE && s.getStoredPacketCount() > 0);
+
+        return timeUp && noPacketsLeft && allSystemsProcessed;
+    }
+
+    private void sendGameOverMessage(PrintWriter out, GameState myState, GameState opponentState) {
+        boolean amIWinner = myState.getCoins() > opponentState.getCoins();
+
+        JSONObject payload = new JSONObject();
+        payload.put("success", amIWinner);
+        payload.put("score", myState.getCoins());
+        payload.put("packetLoss", myState.getPacketLossPercentageBySize());
+        payload.put("level", myState.getCurrentLevelNumber());
+
+        out.println("GAME_OVER:" + payload.toString());
+    }
+
+    private void broadcastSetupState() {
+        JSONObject setupPayload = new JSONObject();
+        setupPayload.put("timeRemaining", (int) setupTimeRemaining);
+        setupPayload.put("p1Ready", p1Ready);
+        setupPayload.put("p2Ready", p2Ready);
+
+        String message = "UPDATE_SETUP:" + setupPayload.toString();
+
+        System.out.println("Server is broadcasting: " + message);
+
+        p1Out.println(message);
+        p2Out.println(message);
+    }
+
+    private void handlePlayerReady(String playerName) {
+        if (playerName.equals("Player 1")) {
+            p1Ready = true;
+            System.out.println("Server: Player 1 is ready.");
+        } else if (playerName.equals("Player 2")) {
+            p2Ready = true;
+            System.out.println("Server: Player 2 is ready.");
+        }
     }
 
 }

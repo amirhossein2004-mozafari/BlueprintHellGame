@@ -48,14 +48,17 @@ public class GameController {
     private boolean collisionTestPacketsSpawned = false;
     private int myPlayerId = 0;
     private static List<PacketType> spawnablePacketTypes = null;
+    private final boolean isOnlineMode;
 
-    public GameController(GameState gameState, GameView gameView, MainApplication mainApp) {
-        if (gameState == null || gameView == null || mainApp == null) {
-            throw new IllegalArgumentException("GameState, GameView, and MainApplication cannot be null for GameController");
+    public GameController(GameState gameState, GameView gameView, MainApplication mainApp, boolean isOnlineMode) {
+
+        if (gameState == null) {
+            throw new IllegalArgumentException("GameState cannot be null for GameController");
         }
         this.gameState = gameState;
         this.gameView = gameView;
         this.mainApp = mainApp;
+        this.isOnlineMode = isOnlineMode;
     }
 
     public void initializeGame() {
@@ -337,42 +340,26 @@ public class GameController {
         }
     }
 
+
     public void handleMousePress(MouseEvent event) {
         if (gameView == null || gameState == null) {
             return;
         }
         Point2D localClick = gameView.sceneToLocal(event.getSceneX(), event.getSceneY());
 
-        if (isPlacingEffect) {
-
-            if (effectToPlace == EffectType.AERGIA_NO_ACCELERATION) {
-                Connection clickedConnection = findClickedConnection(localClick.getX(), localClick.getY());
-                if (clickedConnection != null) {
-                    System.out.println("Aergia effect placed on connection " + clickedConnection.getId());
-                    if(gameState.decreaseCoins(effectCost)){
-                        EffectPoint newEffect = new EffectPoint(effectToPlace, clickedConnection, localClick, effectDuration);
-                        gameState.addEffectPoint(newEffect);
-                        gameView.redrawAll(gameState, null, myPlayerId);
-                    }
-                }
-            } else if (effectToPlace == EffectType.SISYPHUS_MOVE_SYSTEM) {
-                SystemNode clickedSys = findClickedSystem(localClick.getX(), localClick.getY());
-                if (clickedSys != null && clickedSys.getRole() != SystemRole.SOURCE && clickedSys.getRole() != SystemRole.SINK) {
-                    this.isMovingSystem = true;
-                    this.systemToMove = clickedSys;
-                }
-            }
-            isPlacingEffect = false;
-            return;
-        }
-
         if (isWiring || isDraggingBendPoint) {
             return;
         }
 
+        if (isPlacingEffect) {
+            isPlacingEffect = false;
+            return;
+        }
+
         SystemNode clickedSystem = findClickedSystem(localClick.getX(), localClick.getY());
-        if (clickedSystem != null && clickedSystem.isControllable() && !clickedSystem.isOnCooldown()) {
-            System.out.println("Client: Clicked on a controllable system. Sending request to server.");
+
+        if (isOnlineMode && clickedSystem != null && clickedSystem.isControllable() && !clickedSystem.isOnCooldown()) {
+            System.out.println("Client (Online): Clicked controllable system. Sending request.");
             JSONObject payload = new JSONObject();
             payload.put("systemId", clickedSystem.getId().toString());
             NetworkManager.getInstance().sendAction("USE_CONTROLLABLE_SYSTEM", payload);
@@ -387,7 +374,7 @@ public class GameController {
                     isDraggingBendPoint = true;
                     activeConnection = conn;
                     activeBendPointIndex = i;
-                    System.out.println("Client: Started dragging bend point " + i + " on connection " + conn.getId().toString().substring(0,4));
+                    System.out.println("Client: Started dragging bend point " + i);
                     return;
                 }
             }
@@ -395,6 +382,7 @@ public class GameController {
 
         Port clickedPort = findClickedPort(localClick.getX(), localClick.getY(), PortType.OUTPUT);
         if (clickedPort != null && !clickedPort.isConnected()) {
+            System.out.println("DEBUG: Starting wire from port: " + clickedPort.getId().toString().substring(0, 4));
             isWiring = true;
             wiringStartPort = clickedPort;
             tempWire = new Line(clickedPort.getAbsoluteX(), clickedPort.getAbsoluteY(), localClick.getX(), localClick.getY());
@@ -407,14 +395,20 @@ public class GameController {
 
         Connection clickedConnection = findClickedConnection(localClick.getX(), localClick.getY());
         if (clickedConnection != null) {
-            System.out.println("Client: Clicked on a connection. Sending request to add bend point.");
 
-            JSONObject payload = new JSONObject();
-            payload.put("connectionId", clickedConnection.getId().toString());
-            payload.put("x", localClick.getX());
-            payload.put("y", localClick.getY());
-            NetworkManager.getInstance().sendAction("ADD_BEND_POINT", payload);
-
+            if (isOnlineMode) {
+                System.out.println("Client (Online): Clicked on a connection. Sending request to add bend point.");
+                JSONObject payload = new JSONObject();
+                payload.put("connectionId", clickedConnection.getId().toString());
+                payload.put("x", localClick.getX());
+                payload.put("y", localClick.getY());
+                NetworkManager.getInstance().sendAction("ADD_BEND_POINT", payload);
+            } else {
+                if (gameState.decreaseCoins(1)) {
+                    clickedConnection.addBendPoint(localClick);
+                    System.out.println("Client (Offline): Added bend point locally.");
+                }
+            }
             return;
         }
     }
@@ -463,27 +457,52 @@ public class GameController {
     public void handleMouseRelease(MouseEvent event) {
 
         if (isWiring && wiringStartPort != null) {
+            System.out.println("DEBUG: Mouse Released. Attempting to finalize wire.");
             Point2D localReleaseCoords = gameView.sceneToLocal(event.getSceneX(), event.getSceneY());
             Port targetPort = findClickedPort(localReleaseCoords.getX(), localReleaseCoords.getY(), PortType.INPUT);
 
-            if (targetPort != null && !targetPort.isConnected() && isValidConnectionAttempt(wiringStartPort, targetPort)) {
-                JSONObject payload = new JSONObject();
-                payload.put("startPortId", wiringStartPort.getId().toString());
-                payload.put("endPortId", targetPort.getId().toString());
+            if (targetPort == null) {
+                System.err.println(">> DEBUG FAILED: No target Port (INPUT) was found at the release coordinates.");
+            } else {
+                System.out.println(">> DEBUG SUCCESS: Found a target port with ID: " + targetPort.getId().toString().substring(0, 4));
 
-                NetworkManager.getInstance().sendAction("CREATE_WIRE", payload);
-                System.out.println("Client: Sent CREATE_WIRE request to server for ports " +
-                        wiringStartPort.getId().toString().substring(0, 4) + " -> " +
-                        targetPort.getId().toString().substring(0, 4));
+                if (targetPort.isConnected()) {
+                    System.err.println(">> DEBUG FAILED: The found target port is already connected to another wire.");
+                } else {
+                    System.out.println(">> DEBUG INFO: Target port is not connected. Checking validation...");
+
+                    boolean isValid = isValidConnectionAttempt(wiringStartPort, targetPort);
+                    if (!isValid) {
+                        System.err.println(">> DEBUG FAILED: isValidConnectionAttempt returned false. Cannot create connection.");
+                    } else {
+                        System.out.println(">> DEBUG SUCCESS: Connection is valid. isOnlineMode=" + isOnlineMode + ". Sending request...");
+                        if (isOnlineMode) {
+                            JSONObject payload = new JSONObject();
+                            payload.put("startPortId", wiringStartPort.getId().toString());
+                            payload.put("endPortId", targetPort.getId().toString());
+                            NetworkManager.getInstance().sendAction("CREATE_WIRE", payload);
+                        } else {
+                            double requiredLength = new Point2D(wiringStartPort.getAbsoluteX(), wiringStartPort.getAbsoluteY())
+                                    .distance(targetPort.getAbsoluteX(), targetPort.getAbsoluteY());
+                            if (gameState.useWire(requiredLength)) {
+                                Connection newConnection = new Connection(wiringStartPort, targetPort);
+                                gameState.addConnection(newConnection);
+                                AudioManager.playSoundEffect(AudioManager.SFX_CONNECT_SUCCESS);
+                            }
+                        }
+                    }
+                }
             }
         }
 
         else if (isDraggingBendPoint) {
-            System.out.println("Finished dragging bend point.");
+            System.out.println("Client: Finished dragging bend point.");
         }
+
         else if (isMovingSystem) {
-            System.out.println("System move finished.");
+            System.out.println("Client: Finished moving system.");
         }
+
 
 
         isWiring = false;
@@ -503,13 +522,15 @@ public class GameController {
         isPlacingEffect = false;
 
 
-        if (gameView != null && gameState != null) {
-            gameView.redrawAll(gameState, null, myPlayerId);
+
+        if (!isOnlineMode && gameView != null && gameState != null) {
 
             for (SystemNode system : gameState.getSystems()) {
                 system.updateAllPortsActuallyConnectedState();
             }
             checkAndSetAllPortsConnected();
+
+            gameView.redrawAll(gameState, null, 0);
         }
     }
 
@@ -541,23 +562,44 @@ public class GameController {
         }
     }
 
-    private Port findClickedPort(double clickX, double clickY, PortType typeToFind) {
-        if (gameState == null) return null;
-        for (SystemNode system : gameState.getSystems()) {
-            List<Port> portsToCheck = (typeToFind == PortType.INPUT) ? system.getInputPorts() : system.getOutputPorts();
-            for (Port port : portsToCheck) {
-                if (port.getType() == typeToFind) {
-                    double portCenterX = port.getAbsoluteX();
-                    double portCenterY = port.getAbsoluteY();
-                    double size = (port.getPacketType() == PacketType.SQUARE) ? Config.PORT_VISUAL_SIZE_SQUARE : Config.PORT_VISUAL_SIZE_TRIANGLE;
-                    double hitRadius = size + Config.PORT_CLICK_PADDING;
 
-                    if (Math.pow(clickX - portCenterX, 2) + Math.pow(clickY - portCenterY, 2) < hitRadius * hitRadius) {
-                        return port;
-                    }
+    private Port findClickedPort(double clickX, double clickY, PortType typeToFind) {
+        if (gameState == null) {
+            return null;
+        }
+
+        for (SystemNode system : gameState.getSystems()) {
+
+            List<Port> portsToCheck;
+            if (typeToFind == PortType.INPUT) {
+                portsToCheck = system.getInputPorts();
+            } else if (typeToFind == PortType.OUTPUT) {
+                portsToCheck = system.getOutputPorts();
+            } else {
+                continue;
+            }
+
+            for (Port port : portsToCheck) {
+                double portCenterX = port.getAbsoluteX();
+                double portCenterY = port.getAbsoluteY();
+
+                double size;
+                if (port.getPacketType() == PacketType.SQUARE) {
+                    size = Config.PORT_VISUAL_SIZE_SQUARE;
+                } else if (port.getPacketType() == PacketType.TRIANGLE) {
+                    size = Config.PORT_VISUAL_SIZE_TRIANGLE;
+                } else {
+                    size = Config.PORT_BASE_SIZE_UNIT;
+                }
+
+                double hitRadius = size + Config.PORT_CLICK_PADDING;
+
+                if (Math.pow(clickX - portCenterX, 2) + Math.pow(clickY - portCenterY, 2) < hitRadius * hitRadius) {
+                    return port;
                 }
             }
         }
+
         return null;
     }
 
@@ -723,6 +765,13 @@ public class GameController {
 
         if (needsRedraw) {
             gameView.redrawAll(gameState, null, myPlayerId);
+        }
+    }
+
+    public void sendReadySignal() {
+        if (isOnlineMode) {
+            NetworkManager.getInstance().sendAction("PLAYER_READY", new JSONObject());
+            System.out.println("Client: Sent PLAYER_READY signal.");
         }
     }
 

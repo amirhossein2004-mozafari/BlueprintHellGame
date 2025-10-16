@@ -15,6 +15,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
 import javafx.scene.input.KeyCode;
@@ -23,9 +24,7 @@ import javafx.stage.Stage;
 
 import java.io.IOException;
 import java.net.Socket;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 
 import javafx.scene.layout.Pane;
 import javafx.scene.shape.Rectangle;
@@ -55,6 +54,7 @@ public class MainApplication extends Application {
     private AnimationTimer autoSaveTimer;
     private GameState opponentGameState;
     private int myPlayerId = 0;
+    private boolean isOnlineMode = false;
 
 
     @Override
@@ -65,9 +65,9 @@ public class MainApplication extends Application {
         this.settingsControllerInstance = new SettingsController();
         AudioManager.loadSounds();
 
-        boolean isOnline = NetworkManager.getInstance().connect();
+        this.isOnlineMode = NetworkManager.getInstance().connect();
 
-        if (isOnline) {
+        if (this.isOnlineMode) {
             GameState offlineResult = SaveManager.loadGame();
             if (offlineResult != null) {
                 System.out.println("Client: Found offline game result. Sending to server for validation...");
@@ -80,6 +80,9 @@ public class MainApplication extends Application {
                 String serverMessage;
                 try {
                     while ((serverMessage = NetworkManager.getInstance().readMessage()) != null) {
+
+                        final String msgForLog = serverMessage;
+                        Platform.runLater(() -> System.out.println("CLIENT RECEIVED: " + msgForLog));
 
                         String[] parts = serverMessage.split(":", 2);
                         if (parts.length < 2) continue;
@@ -94,7 +97,20 @@ public class MainApplication extends Application {
 
                             case "UPDATE_SYSTEMS":
                                 List<SystemDTO> systemDTOs = SerializationManager.fromJsonToSystemDTOs(jsonData);
-                                Platform.runLater(() -> updateSystemsOnScreen(systemDTOs));
+                                Platform.runLater(() -> {
+                                    if (gameState != null) {
+                                        if (!gameState.isGameRunning()) {
+                                            gameState.setGameRunning(true);
+                                        }
+                                    }
+
+                                    if (hudView != null) {
+                                        hudView.showSetupUI(false);
+                                    }
+
+
+                                    updateSystemsOnScreen(systemDTOs);
+                                });
                                 break;
 
                             case "UPDATE_PACKETS":
@@ -124,6 +140,52 @@ public class MainApplication extends Application {
                                 if (gameController != null) {
                                     gameController.setMyPlayerId(this.myPlayerId);
                                 }
+                                break;
+
+                            case "GAME_OVER":
+                                JSONObject data = new JSONObject(jsonData);
+                                boolean success = data.getBoolean("success");
+                                int score = data.getInt("score");
+                                double packetLoss = data.getDouble("packetLoss");
+                                int level = data.getInt("level");
+
+                                Platform.runLater(() -> showGameOver(success, score, (int)packetLoss));
+                                break;
+
+
+                            case "UPDATE_SETUP":
+                                JSONObject setupData = new JSONObject(jsonData);
+                                int time = setupData.getInt("timeRemaining");
+                                boolean p1Ready = setupData.getBoolean("p1Ready");
+                                boolean p2Ready = setupData.getBoolean("p2Ready");
+
+                                Platform.runLater(() -> {
+                                    try {
+                                        if (gameView == null) {
+                                            System.out.println("Client: First setup update received. Building game scene...");
+
+                                            this.gameState = LevelLoader.loadLevel(1);
+                                            if (this.gameState == null) {
+                                                System.err.println("CRITICAL CLIENT ERROR: Failed to load level1.json. Cannot build scene.");
+                                                return;
+                                            }
+
+                                            setupGameScene();
+                                            primaryStage.show();
+
+                                            System.out.println("Client: Game scene built successfully.");
+                                        }
+
+                                        if (hudView != null) {
+                                            hudView.showSetupUI(true);
+                                            hudView.updateSetupUI(time, p1Ready, p2Ready);
+                                        }
+
+                                    } catch (Exception e) {
+                                        System.err.println("!!!!!! CRITICAL ERROR DURING SCENE/UI SETUP !!!!!!");
+                                        e.printStackTrace();
+                                    }
+                                });
                                 break;
 
                         }
@@ -256,6 +318,10 @@ public class MainApplication extends Application {
         System.out.println("MainApplication.showMainMenu: Menu background music started.");
 
         MenuView menuView = new MenuView(controller);
+        menuView.getChildren().stream()
+                .filter(node -> node instanceof Button && ((Button) node).getText().equals("لیدربرد"))
+                .findFirst()
+                .ifPresent(button -> button.setDisable(!this.isOnlineMode));
         Scene menuScene = new Scene(menuView, Config.WINDOW_WIDTH, Config.WINDOW_HEIGHT);
 
         applyStylesheet(menuScene, "/styles/style.css");
@@ -305,17 +371,17 @@ public class MainApplication extends Application {
 
     private void setupInputHandlers(Scene gameScene, GameController controller, HudView pHudView) {
         gameScene.setOnMousePressed(event -> {
-            if (gameState != null && !gameState.isGameLogicPaused() && this.gameController != null) {
+            if (gameState != null && this.gameController != null) {
                 this.gameController.handleMousePress(event);
             }
         });
         gameScene.setOnMouseDragged(event -> {
-            if (gameState != null && !gameState.isGameLogicPaused() && this.gameController != null) {
+            if (gameState != null && this.gameController != null) {
                 this.gameController.handleMouseDrag(event);
             }
         });
         gameScene.setOnMouseReleased(event -> {
-            if (gameState != null && !gameState.isGameLogicPaused() && this.gameController != null) {
+            if (gameState != null && this.gameController != null) {
                 this.gameController.handleMouseRelease(event);
             }
         });
@@ -535,9 +601,12 @@ public class MainApplication extends Application {
             System.err.println("MainApp.showGameOver WARNING: Current gameState is null, creating placeholder for GameOverView.");
             this.completedGameStateForGameOver = new GameState(currentLevelNumberPlayed,0,0);
         }
+        if (!isOnlineMode && success && completedGameStateForGameOver != null) {
+            System.out.println("MainApp: Saving successful offline game result...");
+            SaveManager.saveGame(completedGameStateForGameOver);
+        }
 
         stopCurrentGameLoop();
-
         this.gameState = null;
         System.out.println("MainApp.showGameOver: Main gameState nulled.");
 
@@ -554,13 +623,12 @@ public class MainApplication extends Application {
     private void setupGameScene() {
         double gameViewHeight = Config.WINDOW_HEIGHT - Config.HUD_HEIGHT;
         this.gameView = new GameView(Config.WINDOW_WIDTH, gameViewHeight);
-        this.hudView = new HudView(this.gameState);
-
+        this.hudView = new HudView(this.gameState, this.gameController);
         BorderPane rootNode = new BorderPane();
         rootNode.setTop(this.hudView);
         rootNode.setCenter(this.gameView);
 
-        this.gameController = new GameController(this.gameState, this.gameView, this);
+        this.gameController = new GameController(this.gameState, this.gameView, this, this.isOnlineMode);
 
 
         if (!this.gameState.getConnections().isEmpty()) {
@@ -618,66 +686,67 @@ public class MainApplication extends Application {
 
 
     private void updateSystemsOnScreen(List<SystemDTO> systemDTOs) {
-        if (gameState == null) {
-            gameState = new GameState(1, 0, 0);
-            for (SystemDTO dto : systemDTOs) {
-                SystemNode node = SerializationManager.fromDTO(dto);
-                node.setId(dto.getId());
-                gameState.addSystem(node);
-            }
-            setupGameScene();
-            primaryStage.show();
-        } else {
-            gameState.clearSystems();
-            for (SystemDTO dto : systemDTOs) {
-                SystemNode node = SerializationManager.fromDTO(dto);
-                node.setId(dto.getId());
-                gameState.addSystem(node);
-            }
-            if (gameView != null) {
-                gameView.redrawAll(gameState, opponentGameState, myPlayerId);
+        if (gameState == null || gameView == null) return;
+
+        Set<UUID> updatedSystemIds = new HashSet<>();
+
+        for (SystemDTO dto : systemDTOs) {
+            updatedSystemIds.add(dto.getId());
+            SystemNode existingNode = gameState.findSystemById(dto.getId());
+
+            if (existingNode == null) {
+                SystemNode newNode = SerializationManager.fromDTO(dto);
+                gameState.addSystem(newNode);
+            } else {
+                existingNode.setPosition(dto.getPosition().getX(), dto.getPosition().getY());
             }
         }
+
+        gameState.removeSystemsNotIn(updatedSystemIds);
+
+        gameView.redrawAll(gameState, opponentGameState, myPlayerId);
     }
 
     private void updatePacketsOnScreen(List<PacketDTO> packetDTOs) {
-        if (gameState == null || gameView == null) {
-            return;
-        }
+        if (gameState == null || gameView == null) return;
 
-        gameState.clearPackets();
+        Set<UUID> updatedPacketIds = new HashSet<>();
 
         for (PacketDTO dto : packetDTOs) {
-            Packet newPacket = SerializationManager.fromDTO(dto);
-            if (newPacket != null) {
+            updatedPacketIds.add(dto.getId());
+            Packet existingPacket = gameState.findPacketById(dto.getId());
+
+            if (existingPacket == null) {
+                Packet newPacket = SerializationManager.fromDTO(dto);
                 gameState.addPacket(newPacket);
+            } else {
+                existingPacket.setX(dto.getX());
+                existingPacket.setY(dto.getY());
             }
         }
-
+        gameState.removePacketsNotIn(updatedPacketIds);
         gameView.updatePacketPositions(gameState);
     }
 
 
     private void updateWiresOnScreen(List<WireDTO> wireDTOs) {
-        if (gameState == null || gameView == null) {
-            return;
-        }
+        if (gameState == null || gameView == null) return;
 
-        gameState.clearConnectionsForSync();
-
+        Set<UUID> updatedWireIds = new HashSet<>();
         for (WireDTO dto : wireDTOs) {
-            Port startPort = gameState.findPortById(dto.getSourceId());
-            Port endPort = gameState.findPortById(dto.getDestinationId());
-
-            if (startPort != null && endPort != null) {
-                Connection newConnection = new Connection(startPort, endPort);
-                newConnection.setId(dto.getId());
-                gameState.addConnection(newConnection);
-            } else {
-                System.err.println("Client: Could not create wire. A port was not found.");
+            updatedWireIds.add(dto.getId());
+            Connection existingConn = gameState.findConnectionById(dto.getId());
+            if (existingConn == null) {
+                Port startPort = gameState.findPortById(dto.getSourceId());
+                Port endPort = gameState.findPortById(dto.getDestinationId());
+                if (startPort != null && endPort != null) {
+                    Connection newConn = new Connection(startPort, endPort);
+                    newConn.setId(dto.getId());
+                    gameState.addConnection(newConn);
+                }
             }
         }
-
+        gameState.removeConnectionsNotIn(updatedWireIds);
         gameView.redrawAll(gameState, opponentGameState, myPlayerId);
     }
 

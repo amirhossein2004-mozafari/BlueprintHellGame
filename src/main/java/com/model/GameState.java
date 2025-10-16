@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import com.api.enums.AbilityType;
 import java.util.UUID;
+import java.util.Set;
 
 public class GameState {
 
@@ -315,6 +316,26 @@ public class GameState {
 
     public void clearConnectionsForSync() {
         this.connections.clear();
+    }
+
+    public SystemNode findSystemById(UUID id) {
+        return systems.stream().filter(s -> s.getId().equals(id)).findFirst().orElse(null);
+    }
+    public Packet findPacketById(UUID id) {
+        return packets.stream().filter(p -> p.getId().equals(id)).findFirst().orElse(null);
+    }
+    public Connection findConnectionById(UUID id) {
+        return connections.stream().filter(c -> c.getId().equals(id)).findFirst().orElse(null);
+    }
+
+    public void removeSystemsNotIn(Set<UUID> idsToKeep) {
+        systems.removeIf(system -> !idsToKeep.contains(system.getId()));
+    }
+    public void removePacketsNotIn(Set<UUID> idsToKeep) {
+        packets.removeIf(packet -> !idsToKeep.contains(packet.getId()));
+    }
+    public void removeConnectionsNotIn(Set<UUID> idsToKeep) {
+        connections.removeIf(conn -> !idsToKeep.contains(conn.getId()));
     }
 
     public void setGameTimeElapsed(double time) {

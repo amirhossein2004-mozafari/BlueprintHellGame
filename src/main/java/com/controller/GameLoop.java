@@ -47,7 +47,7 @@ public class GameLoop extends AnimationTimer {
 
         if (gameState != null) {
             double scaledDeltaTime = deltaTime * gameState.getCurrentTimeScale();
-            gameController.updateGame(scaledDeltaTime);
+            gameController.updateGame(scaledDeltaTime, 0);
         } else {
             System.err.println("Error: GameState is null in GameLoop.handle()!");
         }

@@ -25,6 +25,9 @@ public class GameView extends Pane {
 
     public GameView(double windowWidth, double gameAreaHeight) {
         this.setStyle("-fx-background-color: #" + Config.COLOR_BACKGROUND.toString().substring(2) + ";");
+        Rectangle background = new Rectangle(windowWidth, gameAreaHeight);
+        background.setFill(Color.TRANSPARENT);
+        this.getChildren().add(background);
         this.setPrefSize(windowWidth, gameAreaHeight);
         this.setMinWidth(Math.max(0, windowWidth - Config.SHOP_VIEW_DEFAULT_WIDTH - 50));
         this.setMaxSize(windowWidth, gameAreaHeight);
