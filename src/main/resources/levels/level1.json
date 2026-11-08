@@ -1,0 +1,32 @@
+{
+  "levelNumber": 1,
+  "packetsToSpawn": 20,
+  "levelDurationSeconds": 120.0,
+  "initialWireLength": 6000.0,
+  "systems": [
+    {
+      "x": 100, "y": 220, "role": "SOURCE",
+      "ports": {"squareInputs": 0, "triangleInputs": 0, "squareOutputs": 1, "triangleOutputs": 2}
+    },
+    {
+      "x": 400, "y": 160, "role": "INTERMEDIATE",
+      "ports": {"squareInputs": 1, "triangleInputs": 0, "squareOutputs": 1, "triangleOutputs": 0}
+    },
+    {
+      "x": 500, "y": 320, "role": "INTERMEDIATE",
+      "ports": {"squareInputs": 0, "triangleInputs": 1, "squareOutputs": 1, "triangleOutputs": 1}
+    },
+    {
+      "x": 550, "y": 500, "role": "INTERMEDIATE",
+      "ports": {"squareInputs": 1, "triangleInputs": 1, "squareOutputs": 0, "triangleOutputs": 2}
+    },
+    {
+      "x": 300, "y": 400, "role": "INTERMEDIATE",
+      "ports": {"squareInputs": 0, "triangleInputs": 2, "squareOutputs": 0, "triangleOutputs": 2}
+    },
+    {
+      "x": 750, "y": 300, "role": "SINK",
+      "ports": {"squareInputs": 1, "triangleInputs": 3, "squareOutputs": 0, "triangleOutputs": 0}
+    }
+  ]
+}

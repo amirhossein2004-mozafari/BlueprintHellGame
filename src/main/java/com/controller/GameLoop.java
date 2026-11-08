@@ -1,26 +1,28 @@
 package com.controller;
 
+import com.model.GameState;
 import javafx.animation.AnimationTimer;
 import javafx.scene.control.Label;
-
 
 public class GameLoop extends AnimationTimer {
 
     private final GameController gameController;
+    private final GameState gameState;
     private long previousNanoTime = -1;
     private long lastFpsUpdateTime = 0;
     private int frameCount = 0;
     private Label fpsLabel = null;
 
-    public GameLoop(GameController gameController) {
-        if (gameController == null) {
-            throw new IllegalArgumentException("GameController cannot be null for GameLoop");
+    public GameLoop(GameController gameController, GameState gameState) {
+        if (gameController == null || gameState == null) {
+            throw new IllegalArgumentException("GameController and GameState cannot be null for GameLoop");
         }
         this.gameController = gameController;
+        this.gameState = gameState;
     }
 
-    public GameLoop(GameController gameController, Label fpsLabel) {
-        this(gameController);
+    public GameLoop(GameController gameController, GameState gameState, Label fpsLabel) {
+        this(gameController, gameState);
         this.fpsLabel = fpsLabel;
     }
 
@@ -43,7 +45,12 @@ public class GameLoop extends AnimationTimer {
             lastFpsUpdateTime = currentNanoTime;
         }
 
-        gameController.updateGame(deltaTime);
+        if (gameState != null) {
+            double scaledDeltaTime = deltaTime * gameState.getCurrentTimeScale();
+            gameController.updateGame(scaledDeltaTime);
+        } else {
+            System.err.println("Error: GameState is null in GameLoop.handle()!");
+        }
     }
 
     @Override

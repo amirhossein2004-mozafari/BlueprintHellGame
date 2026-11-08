@@ -3,7 +3,6 @@ package com.controller;
 import com.blueprinthell.MainApplication;
 
 public class MenuController {
-
     private final MainApplication mainApp;
 
     public MenuController(MainApplication mainApp) {
@@ -13,26 +12,27 @@ public class MenuController {
         this.mainApp = mainApp;
     }
 
-    public void handleStartGameButton() {
-        System.out.println("Start Game button clicked - Starting default level 1.");
-        mainApp.startGame(1);
+    public void handleStartGameButton(int levelNumber) {
+        System.out.println("Menu: Start Game (Level " + levelNumber + ") button pressed.");
+        mainApp.startGame(levelNumber);
     }
 
     public void handleSelectLevelButton() {
-        System.out.println("Select Level button clicked - Not implemented yet.");
+        System.out.println("Menu: Select Level button pressed.");
+        mainApp.showLevelSelectionScreen(this);
     }
 
     public void handleSettingsButton() {
-        System.out.println("Settings button clicked.");
-        mainApp.showSettings();
+        System.out.println("Menu: Settings button pressed.");
+        if (mainApp != null) {
+            mainApp.showSettings();
+        }
     }
 
     public void handleExitButton() {
-        System.out.println("Exit button clicked - Exiting application.");
+        System.out.println("Menu: Exit button pressed.");
         if (mainApp != null && mainApp.getPrimaryStage() != null) {
             mainApp.getPrimaryStage().close();
-        } else {
-            System.exit(0);
         }
     }
 }

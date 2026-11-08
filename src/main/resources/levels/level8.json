@@ -1,0 +1,44 @@
+{
+  "levelNumber": 8,
+  "packetsToSpawn": 5,
+  "levelDurationSeconds": 300.0,
+  "initialWireLength": 10000.0,
+  "systems": [
+    {
+      "x": 80,
+      "y": 350,
+      "role": "SOURCE",
+      "ports": { "squareOutputs": 1 }
+    },
+    {
+      "x": 250,
+      "y": 350,
+      "role": "DISTRIBUTE",
+      "ports": { "squareInputs": 1, "triangleOutputs": 2, "squareOutputs": 2 }
+    },
+    {
+      "x": 470,
+      "y": 150,
+      "role": "INTERMEDIATE",
+      "ports": { "triangleInputs": 0, "squareInputs": 2, "triangleOutputs": 0, "squareOutputs": 2 }
+    },
+    {
+      "x": 470,
+      "y": 550,
+      "role": "INTERMEDIATE",
+      "ports": { "triangleInputs": 2, "squareInputs": 0, "triangleOutputs": 2, "squareOutputs": 0 }
+    },
+    {
+      "x": 690,
+      "y": 350,
+      "role": "MERGE",
+      "ports": { "triangleInputs": 2, "squareInputs": 2, "squareOutputs": 1 }
+    },
+    {
+      "x": 860,
+      "y": 350,
+      "role": "SINK",
+      "ports": { "squareInputs": 1 }
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "levelNumber": 2,
+  "packetsToSpawn": 30,
+  "levelDurationSeconds": 180.0,
+  "initialWireLength": 10000.0,
+  "systems": [
+    {
+      "x": 100, "y": 150, "role": "SOURCE",
+      "ports": {"squareInputs": 0, "triangleInputs": 0, "squareOutputs": 2, "triangleOutputs": 2}
+    },
+    {
+      "x": 400, "y": 100, "role": "INTERMEDIATE",
+      "ports": {"squareInputs": 1, "triangleInputs": 1, "squareOutputs": 2, "triangleOutputs": 0}
+    },
+    {
+      "x": 700, "y": 150, "role": "INTERMEDIATE",
+      "ports": {"squareInputs": 1, "triangleInputs": 2, "squareOutputs": 1, "triangleOutputs": 2}
+    },
+    {
+      "x": 170, "y": 400, "role": "INTERMEDIATE",
+      "ports": {"squareInputs": 2, "triangleInputs": 0, "squareOutputs": 1, "triangleOutputs": 1}
+    },
+    {
+      "x": 380, "y": 300, "role": "INTERMEDIATE",
+      "ports": {"squareInputs": 1, "triangleInputs": 1, "squareOutputs": 1, "triangleOutputs": 2}
+    },
+    {
+      "x": 420, "y": 420, "role": "INTERMEDIATE",
+      "ports": {"squareInputs": 1, "triangleInputs": 1, "squareOutputs": 2, "triangleOutputs": 1}
+    },
+    {
+      "x": 820, "y": 300, "role": "INTERMEDIATE",
+      "ports": {"squareInputs": 1, "triangleInputs": 2, "squareOutputs": 2, "triangleOutputs": 0}
+    },
+    {
+      "x": 680, "y": 430, "role": "INTERMEDIATE",
+      "ports": {"squareInputs": 1, "triangleInputs": 1, "squareOutputs": 1, "triangleOutputs": 2}
+    },
+    {
+      "x": 550, "y": 550, "role": "INTERMEDIATE",
+      "ports": {"squareInputs": 1, "triangleInputs": 1, "squareOutputs": 0, "triangleOutputs": 1}
+    },
+    {
+      "x": 300, "y": 550, "role": "SINK",
+      "ports": {"squareInputs": 1, "triangleInputs": 1, "squareOutputs": 0, "triangleOutputs": 0}
+    },
+    {
+      "x": 800, "y": 600, "role": "SINK",
+      "ports": {"squareInputs": 2, "triangleInputs": 1, "squareOutputs": 0, "triangleOutputs": 0}
+    }
+  ]
+}

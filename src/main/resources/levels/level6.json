@@ -1,0 +1,11 @@
+{
+  "levelNumber": 6,
+  "packetsToSpawn": 20,
+  "levelDurationSeconds": 180.0,
+  "systems": [
+    { "x": 100, "y": 200, "role": "SOURCE", "ports": { "squareOutputs": 1 } },
+    { "x": 350, "y": 200, "role": "SABOTEUR", "ports": { "squareInputs": 1, "squareOutputs": 1 } },
+    { "x": 550, "y": 350, "role": "ANTI_TROJAN", "ports": {} },
+    { "x": 600, "y": 200, "role": "SINK", "ports": { "squareInputs": 1 } }
+  ]
+}
